@@ -1,0 +1,9 @@
+qTrace changelog
+================
+
+trunk:
+
+- added information about where a peptide is located within a protein
+- added peak labels and 100% line in spectrum SVGs
+- ambiguous peptides are only reported if they could be quantified
+- fixed stripscans crashing on win32
