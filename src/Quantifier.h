@@ -28,13 +28,13 @@ along with SimQuant.  If not, see <http://www.gnu.org/licenses/>.
 // TODO: verify this neutron mass
 #define NEUTRON 1.002
 #define HEAVY_ARGININE 6.02013
+#define HEAVY_PROLINE 5.016775
 
 struct r_QuantitationFailureReason
 {
 	enum Enumeration {
 		NoMatchedTargetMass,
 		IsotopePeaksMissing,
-		UnlabeledIsotopePeaksNotDescending,
 		ForbiddenPeakPresent,
 		LowSnr,
 		Success,
@@ -60,9 +60,6 @@ struct r_Peak
 };
 
 
-typedef QList<QPair<int, int> > tk_Highlight;
-
-
 struct r_ScanQuantitationResult
 {
 	bool mb_IsGood;
@@ -71,13 +68,14 @@ struct r_ScanQuantitationResult
 	double md_Ratio;
 	double md_Snr;
 	double md_RetentionTime;
-	tk_Highlight mk_Highlight;
-	QList<double> mk_TargetMz;
+	QList<double> mk_UnlabeledTargetMz;
+	QList<double> mk_LabeledTargetMz;
 	double md_MinMz;
 	double md_MaxMz;
 	int mi_Charge;
 	QString ms_ScanId;
-	QList<r_Peak> mk_Peaks;
+	QList<r_Peak> mk_UnlabeledPeaks;
+	QList<r_Peak> mk_LabeledPeaks;
 	
 	// scan data
 	QString ms_ScanHashKey;
@@ -109,8 +107,9 @@ public:
 				 QList<tk_IntPair> ak_MsLevels = QList<tk_IntPair>() << tk_IntPair(0, 0x10000),
 				 int ai_IsotopeCount = 3, int ai_MinCharge = 2, int ai_MaxCharge = 3, 
 				 double ad_MinSnr = 2.0, double ad_MassAccuracy = 5.0,
-				 QString as_SvgOutPath = QString(), QIODevice* ak_TextOutDevice_ = NULL,
-				 QIODevice* ak_YamlOutDevice_ = NULL, bool ab_PrintStatistics = false);
+				 double ad_ExcludeMassAccuracy = 10.0,
+				 QIODevice* ak_CsvOutDevice_ = NULL, QIODevice* ak_XhtmlOutDevice_ = NULL,
+				 bool ab_PrintStatistics = false);
 	virtual ~k_Quantifier();
 	
 	// quantify takes a list of spectra files and a hash of (peptide => protein) entries
@@ -122,13 +121,18 @@ public:
 	
 protected:
 	virtual double calculatePeptideMass(QString as_Peptide, int ai_Charge);
-	virtual r_ScanQuantitationResult searchPeptide(r_Spectrum& ar_Spectrum, double ad_PeptideMz, int ai_Charge, double ad_ModificationMass);
-	virtual QList<r_Peak> findPeaks(r_Spectrum& ar_Spectrum, QList<double> ak_TargetMasses);
 	virtual QList<r_Peak> findAllPeaks(r_Spectrum& ar_Spectrum);
-	virtual r_Peak findPeak(r_Spectrum& ar_Spectrum, int ai_Index);
 	virtual double scale(const double ad_Value) const;
 	virtual void calculateMeanAndStandardDeviation(QList<double> ak_Values, double* ad_Mean_, double* ad_StandardDeviation_);
-	virtual r_ScanQuantitationResult checkResult(QList<r_Peak> ak_Peaks, r_Peak* ar_ForbiddenPeak_, r_Scan& ar_Scan, QString as_Peptide, int ai_Charge, QList<double> ak_TargetMz);
+	virtual r_ScanQuantitationResult 
+		checkResult(QHash<int, r_Peak> ak_LightPeaksInclude, 
+					 QHash<int, r_Peak> ak_HeavyPeaksInclude,
+					 QHash<int, r_Peak> ak_LightPeaksExclude, 
+					 QHash<int, r_Peak> ak_HeavyPeaksExclude,
+					 r_Scan& ar_Scan, QString as_Peptide, 
+					 int ai_Charge, 
+					 QList<double> ak_UnlabeledTargetMz, 
+					 QList<double> ak_LabeledTargetMz);
 	void fitGaussian(double* a_, double* b_, double* c_, double x0, double y0, 
 					 double x1, double y1, double x2, double y2);
 	double gaussian(double x, double a, double b, double c);
@@ -142,26 +146,26 @@ protected:
 			more info:
 */
 	int mi_WatchIsotopesCount;
-	QTextStream mk_TextOutStream;
-	QTextStream mk_YamlOutStream;
+	QTextStream mk_CsvOutStream;
+	QTextStream mk_XhtmlOutStream;
 	int mi_MinCharge;
 	int mi_MaxCharge;
 	double md_MinSnr;
 	double md_MassAccuracy;
+	double md_ExcludeMassAccuracy;
 	double md_ElutionProfilePeakWidth;
-	QString ms_SvgOutPath;
 	bool mb_PrintStatistics;
-	tk_SpotResults mk_SpotResults;
 	QList<double> mk_AllTargetMasses;
 	QString ms_CurrentSpot;
 	QStringList mk_Peptides;
 	QHash<char, double> mk_AminoAcidWeight;
-	QHash<QString, r_Scan> mk_ScanHash;
+	unsigned int mui_QuantitationResultCount;
 	
 	// peptide-charge-label-isotope
 	QHash<QString, int> mk_TargetMzIndex;
 	
 	QHash<QString, r_QuantitationFailureReason::Enumeration> mk_ScanFailureReason;
+	QHash<QString, int> mk_LabeledEnvelopeCountForPeptide;
 	
 	//QHash<QString, QList<QList<double> > > mk_ElutionProfile;
 };

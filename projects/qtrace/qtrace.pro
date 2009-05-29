@@ -5,7 +5,7 @@ CONFIG(debug, debug|release) {
 	TARGET = $$join(TARGET,,,_debug)
 }
 
-RESOURCES += qtrace.rc
+RESOURCES += ../../src/qtrace.qrc
 
 HEADERS += \
 	../../src/Quantifier.h \

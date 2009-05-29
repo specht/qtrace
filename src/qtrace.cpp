@@ -1,24 +1,25 @@
 /*
-Copyright (c) 2007-20089 Michael Specht
+Copyright (c) 2007-2008 Michael Specht
 
-This file is part of qTrace.
+This file is part of SimQuant.
 
-qTrace is free software: you can redistribute it and/or modify
+SimQuant is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
 the Free Software Foundation, either version 3 of the License, or
 (at your option) any later version.
 
-qTrace is distributed in the hope that it will be useful,
+SimQuant is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License
-along with qTrace.  If not, see <http://www.gnu.org/licenses/>.
+along with SimQuant.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 #include <QtCore>
 #include <stdio.h>
+#include "FastaReader.h"
 #include "Quantifier.h"
 #include "RefPtr.h"
 #include "version.h"
@@ -35,18 +36,17 @@ void printUsageAndExit()
 	printf("  --maxCharge [int] (default: 3)\n");
 	printf("  --minSnr [float] (default: 2.0)\n");
 	printf("  --massAccuracy (ppm) [float] (default: 5.0)\n");
-	printf("  --svgOutPath [string] (default: none)\n");
-	printf("      If svgOutPath is specified, SVG files will be created for each\n");
-	printf("      specturm that was used for the quantitation. Please note that\n");
-	printf("      the specified path must be empty.\n");
-	printf("  --textOutput [flag] (default: yes)\n");
-	printf("      Enable or disable text output.\n");
-	printf("  --textOutputTarget [path] (default: stdout)\n");
-	printf("      Redirect text output to a file. Enables text output.\n");
-	printf("  --yamlOutput [flag] (default: no)\n");
-	printf("      Enable or disable YAML output.\n");
-	printf("  --yamlOutputTarget [path] (default: stdout)\n");
-	printf("      Redirect YAML output to a file. Enables YAML output.\n");
+	printf("      This mass accuracy is used to check for the presence of peaks.\n");
+	printf("  --excludeMassAccuracy (ppm) [float] (default: 10.0)\n");
+	printf("      This mass accuracy is used to check for the absence of peaks.\n");
+	printf("  --csvOutput [flag] (default: yes)\n");
+	printf("      Enable or disable CSV output.\n");
+	printf("  --csvOutputTarget [path] (default: stdout)\n");
+	printf("      Redirect CSV output to a file. Enables CSV output.\n");
+	printf("  --xhtmlOutput [flag] (default: no)\n");
+	printf("      Enable or disable XHTML output.\n");
+	printf("  --xhtmlOutputTarget [string] (default: stdout)\n");
+	printf("      Redirect XHTML output to a file. Enables XHTML output.\n");
 	printf("  --statistics [flag] (default: no)\n");
 	printf("      Print details about reasons why quantitation failed in scans.\n");
 	printf("  --version\n");
@@ -87,17 +87,17 @@ int main(int ai_ArgumentCount, char** ac_Arguments__)
 	int li_MaxCharge = 3;
 	double ld_MinSnr = 2.0;
 	double ld_MassAccuracy = 5.0;
+	double ld_ExcludeMassAccruracy = 10.0;
 	bool lb_PrintStatistics = false;
-	QString ls_SvgOutPath;
 	
 	QFile lk_StdOut;
 	lk_StdOut.open(stdout, QIODevice::WriteOnly);
 	
-	RefPtr<QFile> lk_pTextOutFile;
-	RefPtr<QFile> lk_pYamlOutFile;
+	RefPtr<QFile> lk_pCsvOutFile;
+	RefPtr<QFile> lk_pXhtmlOutFile;
 	
-	QIODevice* lk_TextDevice_ = &lk_StdOut;
-	QIODevice* lk_YamlDevice_ = &lk_StdOut;
+	QIODevice* lk_CsvDevice_ = &lk_StdOut;
+	QIODevice* lk_XhtmlDevice_ = &lk_StdOut;
 	
 	// consume options
 	int li_Index;
@@ -164,58 +164,50 @@ int main(int ai_ArgumentCount, char** ac_Arguments__)
 		lk_Arguments.removeAt(li_Index);
 	}
 	
-	li_Index = lk_Arguments.indexOf("--svgOutPath");
+	li_Index = lk_Arguments.indexOf("--excludeMassAccuracy");
 	if (li_Index > -1)
 	{
-		ls_SvgOutPath = lk_Arguments[li_Index + 1];
+		ld_ExcludeMassAccruracy = QVariant(lk_Arguments[li_Index + 1]).toDouble();
 		lk_Arguments.removeAt(li_Index);
 		lk_Arguments.removeAt(li_Index);
 	}
 	
-	li_Index = lk_Arguments.indexOf("--svgOutPath");
-	if (li_Index > -1)
-	{
-		ls_SvgOutPath = lk_Arguments[li_Index + 1];
-		lk_Arguments.removeAt(li_Index);
-		lk_Arguments.removeAt(li_Index);
-	}
-	
-	li_Index = lk_Arguments.indexOf("--textOutput");
+	li_Index = lk_Arguments.indexOf("--csvOutput");
 	if (li_Index > -1)
 	{
 		QString ls_Value = lk_Arguments[li_Index + 1];
 		if (!stringToBool(ls_Value))
-			lk_TextDevice_ = NULL;
+			lk_CsvDevice_ = NULL;
 		lk_Arguments.removeAt(li_Index);
 		lk_Arguments.removeAt(li_Index);
 	}
 	
-	li_Index = lk_Arguments.indexOf("--textOutputTarget");
+	li_Index = lk_Arguments.indexOf("--csvOutputTarget");
 	if (li_Index > -1)
 	{
-		lk_pTextOutFile = RefPtr<QFile>(new QFile(lk_Arguments[li_Index + 1]));
-		lk_pTextOutFile->open(QIODevice::WriteOnly);
-		lk_TextDevice_ = lk_pTextOutFile.get_Pointer();
+		lk_pCsvOutFile = RefPtr<QFile>(new QFile(lk_Arguments[li_Index + 1]));
+		lk_pCsvOutFile->open(QIODevice::WriteOnly);
+		lk_CsvDevice_ = lk_pCsvOutFile.get_Pointer();
 		lk_Arguments.removeAt(li_Index);
 		lk_Arguments.removeAt(li_Index);
 	}
 	
-	li_Index = lk_Arguments.indexOf("--yamlOutput");
+	li_Index = lk_Arguments.indexOf("--xhtmlOutput");
 	if (li_Index > -1)
 	{
 		QString ls_Value = lk_Arguments[li_Index + 1];
 		if (!stringToBool(ls_Value))
-			lk_YamlDevice_ = NULL;
+			lk_XhtmlDevice_ = NULL;
 		lk_Arguments.removeAt(li_Index);
 		lk_Arguments.removeAt(li_Index);
 	}
 	
-	li_Index = lk_Arguments.indexOf("--yamlOutputTarget");
+	li_Index = lk_Arguments.indexOf("--xhtmlOutputTarget");
 	if (li_Index > -1)
 	{
-		lk_pYamlOutFile = RefPtr<QFile>(new QFile(lk_Arguments[li_Index + 1]));
-		lk_pYamlOutFile->open(QIODevice::WriteOnly);
-		lk_YamlDevice_ = lk_pYamlOutFile.get_Pointer();
+		lk_pXhtmlOutFile = RefPtr<QFile>(new QFile(lk_Arguments[li_Index + 1]));
+		lk_pXhtmlOutFile->open(QIODevice::WriteOnly);
+		lk_XhtmlDevice_ = lk_pXhtmlOutFile.get_Pointer();
 		lk_Arguments.removeAt(li_Index);
 		lk_Arguments.removeAt(li_Index);
 	}
@@ -232,8 +224,8 @@ int main(int ai_ArgumentCount, char** ac_Arguments__)
 	//RefPtr<QIODevice> lk_pTextDevice(new QIODevice(stdout));
 	
 	k_Quantifier lk_Quantifier(le_ScanType, QList<tk_IntPair>() << tk_IntPair(1, 1),
-		li_IsotopeCount, li_MinCharge, li_MaxCharge, ld_MinSnr,
-		ld_MassAccuracy, ls_SvgOutPath, lk_TextDevice_, lk_YamlDevice_, lb_PrintStatistics);
+		li_IsotopeCount, li_MinCharge, li_MaxCharge, ld_MinSnr, ld_MassAccuracy, 
+		ld_ExcludeMassAccruracy, lk_CsvDevice_, lk_XhtmlDevice_, lb_PrintStatistics);
 		
 	QStringList lk_SpectraFiles;
 	QStringList lk_Peptides;
