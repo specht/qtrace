@@ -19,9 +19,9 @@ along with SimQuant.  If not, see <http://www.gnu.org/licenses/>.
 
 #include <QtCore>
 #include <stdio.h>
-#include "FastaReader.h"
+#include <ptb/FastaReader.h>
 #include "Quantifier.h"
-#include "RefPtr.h"
+#include <ptb/RefPtr.h>
 #include "version.h"
 
 

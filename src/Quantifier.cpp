@@ -71,7 +71,7 @@ k_Quantifier::k_Quantifier(r_ScanType::Enumeration ae_ScanType,
 		exit(1);
 	}
 	
-	Q_INIT_RESOURCE(simquant);
+	Q_INIT_RESOURCE(qtrace);
 	
 	QFile lk_File(":res/AminoAcids.csv");
 	lk_File.open(QFile::ReadOnly);
