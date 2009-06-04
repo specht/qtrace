@@ -6,8 +6,13 @@ DEPENDPATH += .
 INCLUDEPATH += .
 
 macx {
+	LIBPATH += /Users/michael/programming/ext/lib
+	INCLUDEPATH += /Users/michael/programming/ext/include
+}
+
+macx {
 	CONFIG -= app_bundle
-	CONFIG += x86
+	CONFIG += x86 ppc
 }
 
 LIBS += -lptb -lz -lbz2 -lquazip
