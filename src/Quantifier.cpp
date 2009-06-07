@@ -19,7 +19,6 @@ along with SimQuant.  If not, see <http://www.gnu.org/licenses/>.
 
 #include "Quantifier.h"
 #include <QtCore>
-#include <QtSvg>
 #include <math.h> 
 #include <limits>
 
@@ -455,7 +454,8 @@ void k_Quantifier::handleScan(r_Scan& ar_Scan)
 						<< "," << lr_ScanResult.md_Snr
 						<< endl;
 				}
-				
+
+/*
 				if (mk_XhtmlOutStream.device())
 				{
 					mk_XhtmlOutStream << QString("\n<!-- BEGIN PEPTIDE %1 -->\n").arg(ls_Peptide); 
@@ -479,6 +479,7 @@ void k_Quantifier::handleScan(r_Scan& ar_Scan)
 					mk_XhtmlOutStream << "</div>" << endl;
 					mk_XhtmlOutStream << QString("\n<!-- END PEPTIDE %1 -->\n").arg(ls_Peptide); 
 				}
+				*/
 			}
 		}
 	}
@@ -577,6 +578,7 @@ QList<r_Peak> k_Quantifier::findAllPeaks(r_Spectrum& ar_Spectrum)
 
 QString k_Quantifier::renderScanAsSvg(r_Scan& ar_Scan, r_ScanQuantitationResult ar_QuantitationResult)
 {
+	/*
 	double ld_Ratio = 4.0;
 	double ld_Width = 1024.0;
 	double ld_Height = ld_Width / ld_Ratio;
@@ -736,6 +738,8 @@ QString k_Quantifier::renderScanAsSvg(r_Scan& ar_Scan, r_ScanQuantitationResult 
 	}
 	ls_Result.replace("</svg>", ls_Labels + "</svg>");
 	return ls_Result;
+	*/
+	return QString();
 }
 
 
