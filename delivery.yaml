@@ -1,6 +1,6 @@
 projects:
   - projects/qtrace
-qt: [core, gui]
+qt: [core, xml]
 win32Libs: []
 versionInject:
   src/version.h: |
