@@ -30,6 +30,7 @@ void printUsageAndExit()
 	printf("Usage: qtrace [options] --spectraFiles [spectra files] --peptides [peptides] --peptideFiles [peptide files]\n");
 	printf("Spectra files may be mzData, mzXML or mzML, optionally compressed (.gz|.bz2|.zip).\n");
 	printf("Options:\n");
+	printf("  --label [R|RP] (default: RP)\n");
 	printf("  --scanType [full|sim|all] (default: all)\n");
 	printf("  --isotopeCount [int] (default: 3)\n");
 	printf("  --minCharge [int] (default: 2)\n");
@@ -43,12 +44,12 @@ void printUsageAndExit()
 	printf("      Enable or disable CSV output.\n");
 	printf("  --csvOutputTarget [path] (default: stdout)\n");
 	printf("      Redirect CSV output to a file. Enables CSV output.\n");
-	printf("  --xhtmlOutput [flag] (default: no)\n");
+/*	printf("  --xhtmlOutput [flag] (default: no)\n");
 	printf("      Enable or disable XHTML output.\n");
 	printf("  --xhtmlOutputTarget [string] (default: stdout)\n");
 	printf("      Redirect XHTML output to a file. Enables XHTML output.\n");
 	printf("  --statistics [flag] (default: no)\n");
-	printf("      Print details about reasons why quantitation failed in scans.\n");
+	printf("      Print details about reasons why quantitation failed in scans.\n");*/
 	printf("  --version\n");
 	printf("      Print version and exit.\n");
 	exit(1);
@@ -80,7 +81,8 @@ int main(int ai_ArgumentCount, char** ac_Arguments__)
 		printf("qtrace %s\n", gs_Version.toStdString().c_str());
 		exit(0);
 	}
-		
+
+	r_LabelType::Enumeration le_LabelType = r_LabelType::HeavyArginineAndProline;
 	r_ScanType::Enumeration le_ScanType = r_ScanType::All;
 	int li_IsotopeCount = 3;
 	int li_MinCharge = 2;
@@ -97,10 +99,28 @@ int main(int ai_ArgumentCount, char** ac_Arguments__)
 	RefPtr<QFile> lk_pXhtmlOutFile;
 	
 	QIODevice* lk_CsvDevice_ = &lk_StdOut;
-	QIODevice* lk_XhtmlDevice_ = &lk_StdOut;
+// 	QIODevice* lk_XhtmlDevice_ = &lk_StdOut;
+	QIODevice* lk_XhtmlDevice_ = NULL;
 	
 	// consume options
 	int li_Index;
+	
+	li_Index = lk_Arguments.indexOf("--label");
+	if (li_Index > -1)
+	{
+		QString ls_Label = lk_Arguments[li_Index + 1].toUpper();
+		lk_Arguments.removeAt(li_Index);
+		lk_Arguments.removeAt(li_Index);
+		if (ls_Label == "R")
+			le_LabelType = r_LabelType::HeavyArginine;
+		else if (ls_Label == "RP")
+			le_LabelType = r_LabelType::HeavyArginineAndProline;
+		else
+		{
+			printf("Error: unknown label %s.\n", ls_Label.toStdString().c_str());
+			exit(1);
+		}
+	}
 	
 	li_Index = lk_Arguments.indexOf("--scanType");
 	if (li_Index > -1)
@@ -192,7 +212,7 @@ int main(int ai_ArgumentCount, char** ac_Arguments__)
 		lk_Arguments.removeAt(li_Index);
 	}
 	
-	li_Index = lk_Arguments.indexOf("--xhtmlOutput");
+/*	li_Index = lk_Arguments.indexOf("--xhtmlOutput");
 	if (li_Index > -1)
 	{
 		QString ls_Value = lk_Arguments[li_Index + 1];
@@ -219,11 +239,11 @@ int main(int ai_ArgumentCount, char** ac_Arguments__)
 		lb_PrintStatistics = stringToBool(ls_Value);
 		lk_Arguments.removeAt(li_Index);
 		lk_Arguments.removeAt(li_Index);
-	}
+	}*/
 	
 	//RefPtr<QIODevice> lk_pTextDevice(new QIODevice(stdout));
 	
-	k_Quantifier lk_Quantifier(le_ScanType, QList<tk_IntPair>() << tk_IntPair(1, 1),
+	k_Quantifier lk_Quantifier(le_LabelType, le_ScanType, QList<tk_IntPair>() << tk_IntPair(1, 1),
 		li_IsotopeCount, li_MinCharge, li_MaxCharge, ld_MinSnr, ld_MassAccuracy, 
 		ld_ExcludeMassAccruracy, lk_CsvDevice_, lk_XhtmlDevice_, lb_PrintStatistics);
 		

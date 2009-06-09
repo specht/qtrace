@@ -23,7 +23,8 @@ along with SimQuant.  If not, see <http://www.gnu.org/licenses/>.
 #include <limits>
 
 
-k_Quantifier::k_Quantifier(r_ScanType::Enumeration ae_ScanType,
+k_Quantifier::k_Quantifier(r_LabelType::Enumeration ae_LabelType,
+						   r_ScanType::Enumeration ae_ScanType,
 						   QList<tk_IntPair> ak_MsLevels,
 						   int ai_IsotopeCount, int ai_MinCharge, int ai_MaxCharge, 
 						   double ad_MinSnr, double ad_MassAccuracy, 
@@ -31,6 +32,7 @@ k_Quantifier::k_Quantifier(r_ScanType::Enumeration ae_ScanType,
 						   QIODevice* ak_CsvOutDevice_, QIODevice* ak_XhtmlOutDevice_,
 						   bool ab_PrintStatistics)
 	: k_ScanIterator(ae_ScanType, ak_MsLevels)
+	, me_LabelType(ae_LabelType)
 	, mi_WatchIsotopesCount(ai_IsotopeCount)
 	, mk_CsvOutStream(ak_CsvOutDevice_)
 	, mk_XhtmlOutStream(ak_XhtmlOutDevice_)
@@ -143,7 +145,7 @@ void k_Quantifier::quantify(QStringList ak_SpectraFiles, QStringList ak_Peptides
 	for (int li_PeptideIndex = 0; li_PeptideIndex < mk_Peptides.size(); ++li_PeptideIndex)
 	{
 		QString ls_Peptide = mk_Peptides[li_PeptideIndex];
-		mk_LabeledEnvelopeCountForPeptide[ls_Peptide] = ls_Peptide.count("P") + 1;
+		mk_LabeledEnvelopeCountForPeptide[ls_Peptide] = (me_LabelType == r_LabelType::HeavyArginine) ? 1 : ls_Peptide.count("P") + 1;
 		for (int li_Charge = mi_MinCharge; li_Charge <= mi_MaxCharge; ++li_Charge)
 		{
 			double ld_PeptideMz = this->calculatePeptideMass(ls_Peptide, li_Charge);

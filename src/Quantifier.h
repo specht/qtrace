@@ -30,6 +30,15 @@ along with SimQuant.  If not, see <http://www.gnu.org/licenses/>.
 #define HEAVY_ARGININE 6.02013
 #define HEAVY_PROLINE 5.016775
 
+struct r_LabelType
+{
+	enum Enumeration {
+		HeavyArginine = 0,
+		HeavyArginineAndProline = 1,
+		Size
+	};
+};
+
 struct r_QuantitationFailureReason
 {
 	enum Enumeration {
@@ -103,7 +112,8 @@ typedef QHash<QString, QList<r_ScanQuantitationResult> > tk_SpotResults;
 class k_Quantifier: public k_ScanIterator
 {
 public:
-	k_Quantifier(r_ScanType::Enumeration ae_ScanType = r_ScanType::All,
+	k_Quantifier(r_LabelType::Enumeration ae_LabelType = r_LabelType::HeavyArginineAndProline,
+				 r_ScanType::Enumeration ae_ScanType = r_ScanType::All,
 				 QList<tk_IntPair> ak_MsLevels = QList<tk_IntPair>() << tk_IntPair(0, 0x10000),
 				 int ai_IsotopeCount = 3, int ai_MinCharge = 2, int ai_MaxCharge = 3, 
 				 double ad_MinSnr = 2.0, double ad_MassAccuracy = 5.0,
@@ -148,6 +158,7 @@ protected:
 	int mi_WatchIsotopesCount;
 	QTextStream mk_CsvOutStream;
 	QTextStream mk_XhtmlOutStream;
+	r_LabelType::Enumeration me_LabelType;
 	int mi_MinCharge;
 	int mi_MaxCharge;
 	double md_MinSnr;
