@@ -52,23 +52,6 @@ struct r_QuantitationFailureReason
 };
 
 
-struct r_Peak
-{
-	int mi_PeakIndex;
-	int mi_LeftBorderIndex;
-	int mi_RightBorderIndex;
-	// attention, these are gauss peak m/z and intensity values! yay!
-	double md_PeakMz;
-	double md_PeakIntensity;
-	double md_PeakArea;
-	double md_OutsideBorderMaxIntensity;
-	double md_Snr;
-	double md_GaussA;
-	double md_GaussB;
-	double md_GaussC;
-};
-
-
 struct r_ScanQuantitationResult
 {
 	bool mb_IsGood;
