@@ -30,7 +30,10 @@ void printUsageAndExit()
 	printf("Usage: qtrace [options] --spectraFiles [spectra files] --peptides [peptides] --peptideFiles [peptide files]\n");
 	printf("Spectra files may be mzData, mzXML or mzML, optionally compressed (.gz|.bz2|.zip).\n");
 	printf("Options:\n");
-	printf("  --label [R|RP] (default: RP)\n");
+	printf("  --label [R|RP|N15] (default: RP)\n");
+	printf("      R  : SILAC labeling with 13C6-arginine.\n");
+	printf("      RP : SILAC labeling with 13C6-arginine, additional care is taken for accidentally labeled proline residues.\n");
+	printf("      N15: N15 labeling, where every amino acid is affected.\n");
 	printf("  --scanType [full|sim|all] (default: all)\n");
 	printf("  --isotopeCount [int] (default: 3)\n");
 	printf("  --minCharge [int] (default: 2)\n");
@@ -38,7 +41,7 @@ void printUsageAndExit()
 	printf("  --minSnr [float] (default: 2.0)\n");
 	printf("  --massAccuracy (ppm) [float] (default: 5.0)\n");
 	printf("      This mass accuracy is used to check for the presence of peaks.\n");
-	printf("  --excludeMassAccuracy (ppm) [float] (default: 10.0)\n");
+	printf("  --excludeMassAccuracy (ppm) [float] (default: 30.0)\n");
 	printf("      This mass accuracy is used to check for the absence of peaks.\n");
 	printf("  --csvOutput [flag] (default: yes)\n");
 	printf("      Enable or disable CSV output.\n");
@@ -89,7 +92,7 @@ int main(int ai_ArgumentCount, char** ac_Arguments__)
 	int li_MaxCharge = 3;
 	double ld_MinSnr = 2.0;
 	double ld_MassAccuracy = 5.0;
-	double ld_ExcludeMassAccruracy = 10.0;
+	double ld_ExcludeMassAccruracy = 30.0;
 	bool lb_PrintStatistics = false;
 	
 	QFile lk_StdOut;
@@ -115,6 +118,8 @@ int main(int ai_ArgumentCount, char** ac_Arguments__)
 			le_LabelType = r_LabelType::HeavyArginine;
 		else if (ls_Label == "RP")
 			le_LabelType = r_LabelType::HeavyArginineAndProline;
+		else if (ls_Label == "N15")
+			le_LabelType = r_LabelType::N15Labeling;
 		else
 		{
 			printf("Error: unknown label %s.\n", ls_Label.toStdString().c_str());

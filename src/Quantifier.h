@@ -35,6 +35,7 @@ struct r_LabelType
 	enum Enumeration {
 		HeavyArginine = 0,
 		HeavyArginineAndProline = 1,
+		N15Labeling = 2,
 		Size
 	};
 };
@@ -114,7 +115,6 @@ public:
 	
 protected:
 	virtual double calculatePeptideMass(QString as_Peptide, int ai_Charge);
-	virtual QList<r_Peak> findAllPeaks(r_Spectrum& ar_Spectrum);
 	virtual double scale(const double ad_Value) const;
 	virtual void calculateMeanAndStandardDeviation(QList<double> ak_Values, double* ad_Mean_, double* ad_StandardDeviation_);
 	virtual r_ScanQuantitationResult 
@@ -153,6 +153,7 @@ protected:
 	QString ms_CurrentSpot;
 	QStringList mk_Peptides;
 	QHash<char, double> mk_AminoAcidWeight;
+	QHash<char, int> mk_AminoAcidNitrogenCount;
 	unsigned int mui_QuantitationResultCount;
 	
 	// peptide-charge-label-isotope

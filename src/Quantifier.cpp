@@ -78,6 +78,7 @@ k_Quantifier::k_Quantifier(r_LabelType::Enumeration ae_LabelType,
 	lk_File.open(QFile::ReadOnly);
 	QTextStream lk_TextStream(&lk_File);
 
+	lk_TextStream.readLine();
 	while (!lk_TextStream.atEnd())
 	{
 		QString ls_Line = lk_TextStream.readLine().trimmed();
@@ -86,6 +87,32 @@ k_Quantifier::k_Quantifier(r_LabelType::Enumeration ae_LabelType,
 
 		QStringList lk_List = ls_Line.split(QChar(';'));
 		mk_AminoAcidWeight[lk_List[3][0].toAscii()] = lk_List[4].toDouble();
+		QString ls_Composition = lk_List[6];
+		ls_Composition.remove("\"");
+		QHash<char, int> lk_ElementCount;
+		while (!ls_Composition.isEmpty())
+		{
+			char lc_Element = ls_Composition.at(0).toAscii();
+			lk_ElementCount[lc_Element] = 1;
+			ls_Composition = ls_Composition.right(ls_Composition.length() - 1);
+			if (ls_Composition.isEmpty())
+				break;
+			QString ls_Number;
+			char lc_NextChar = ls_Composition.at(0).toAscii();
+			while (lc_NextChar >= '0' && lc_NextChar <= '9')
+			{
+				ls_Number += QChar(lc_NextChar);
+				ls_Composition = ls_Composition.right(ls_Composition.length() - 1);
+				if (ls_Composition.isEmpty())
+					break;
+				lc_NextChar = ls_Composition.at(0).toAscii();
+			}
+			if (!ls_Number.isEmpty())
+				lk_ElementCount[lc_Element] = ls_Number.toInt();
+		}
+		int li_NitrogenCount = 0;
+		if (lk_ElementCount.contains('N'))
+			li_NitrogenCount = lk_ElementCount['N'];
 	}
 	lk_File.close();
 }
@@ -286,7 +313,7 @@ void k_Quantifier::handleScan(r_Scan& ar_Scan)
 	QHash<QString, int> lk_TargetPeakEndIndex;
 	
 	// find all peaks in this spectrum
-	QList<r_Peak> lk_AllPeaks = this->findAllPeaks(ar_Scan.mr_Spectrum);
+	QList<r_Peak> lk_AllPeaks = k_ScanIterator::findAllPeaks(ar_Scan.mr_Spectrum);
 	
 	// we need at least a few peaks
 	if (lk_AllPeaks.size() < mi_WatchIsotopesCount * 2)
