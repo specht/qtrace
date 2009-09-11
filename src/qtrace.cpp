@@ -54,9 +54,9 @@ void printUsageAndExit()
 /*	printf("  --xhtmlOutput [flag] (default: no)\n");
 	printf("      Enable or disable XHTML output.\n");
 	printf("  --xhtmlOutputTarget [string] (default: stdout)\n");
-	printf("      Redirect XHTML output to a file. Enables XHTML output.\n");
+	printf("      Redirect XHTML output to a file. Enables XHTML output.\n");*/
 	printf("  --statistics [flag] (default: no)\n");
-	printf("      Print details about reasons why quantitation failed in scans.\n");*/
+	printf("      Print details about reasons why quantitation failed in scans.\n");
 	printf("  --version\n");
 	printf("      Print version and exit.\n");
 	exit(1);
@@ -260,6 +260,7 @@ int main(int ai_ArgumentCount, char** ac_Arguments__)
 		lk_Arguments.removeAt(li_Index);
 		lk_Arguments.removeAt(li_Index);
 	}
+	*/
 	
 	li_Index = lk_Arguments.indexOf("--printStatistics");
 	if (li_Index > -1)
@@ -268,7 +269,7 @@ int main(int ai_ArgumentCount, char** ac_Arguments__)
 		lb_PrintStatistics = stringToBool(ls_Value);
 		lk_Arguments.removeAt(li_Index);
 		lk_Arguments.removeAt(li_Index);
-	}*/
+	}
 	
 	//RefPtr<QIODevice> lk_pTextDevice(new QIODevice(stdout));
 	
