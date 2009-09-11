@@ -205,7 +205,7 @@ void k_Quantifier::quantify(QStringList ak_SpectraFiles, QStringList ak_Peptides
 				for (int i = 0; i < ls_Peptide.length(); ++i)
 					li_NitrogenCount += mk_AminoAcidNitrogenCount[ls_Peptide.at(i).toAscii()];
 // 				printf("%d N in %s\n", li_NitrogenCount, ls_Peptide.toStdString().c_str());
-				ld_ModMz = NEUTRON * li_NitrogenCount * 0.955;
+				ld_ModMz = HEAVY_NITROGEN * li_NitrogenCount;
 			}
 			else
 				ld_ModMz = HEAVY_ARGININE * ls_Peptide.count("R");
