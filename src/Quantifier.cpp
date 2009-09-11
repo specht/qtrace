@@ -85,8 +85,15 @@ k_Quantifier::k_Quantifier(r_LabelType::Enumeration ae_LabelType,
 		if (ls_Line.isEmpty() || ls_Line.startsWith("#"))
 			continue;
 
-		QStringList lk_List = ls_Line.split(QChar(';'));
-		mk_AminoAcidWeight[lk_List[3][0].toAscii()] = lk_List[4].toDouble();
+		QStringList lk_List;
+		foreach (QString ls_Entry, ls_Line.split(QChar(';')))
+		{
+			if (ls_Entry.at(0) == QChar('"') && ls_Entry.at(ls_Entry.length() - 1) == QChar('"'))
+				ls_Entry = ls_Entry.mid(1, ls_Entry.length() - 2);
+			lk_List << ls_Entry;
+		}
+		char lc_AminoAcid = lk_List[3][0].toAscii();
+		mk_AminoAcidWeight[lc_AminoAcid] = lk_List[4].toDouble();
 		QString ls_Composition = lk_List[6];
 		ls_Composition.remove("\"");
 		QHash<char, int> lk_ElementCount;
@@ -113,6 +120,7 @@ k_Quantifier::k_Quantifier(r_LabelType::Enumeration ae_LabelType,
 		int li_NitrogenCount = 0;
 		if (lk_ElementCount.contains('N'))
 			li_NitrogenCount = lk_ElementCount['N'];
+		mk_AminoAcidNitrogenCount[lc_AminoAcid] = li_NitrogenCount;
 	}
 	lk_File.close();
 }
@@ -172,11 +180,35 @@ void k_Quantifier::quantify(QStringList ak_SpectraFiles, QStringList ak_Peptides
 	for (int li_PeptideIndex = 0; li_PeptideIndex < mk_Peptides.size(); ++li_PeptideIndex)
 	{
 		QString ls_Peptide = mk_Peptides[li_PeptideIndex];
-		mk_LabeledEnvelopeCountForPeptide[ls_Peptide] = (me_LabelType == r_LabelType::HeavyArginine) ? 1 : ls_Peptide.count("P") + 1;
+		switch (me_LabelType)
+		{
+			case r_LabelType::HeavyArginine:
+				mk_LabeledEnvelopeCountForPeptide[ls_Peptide] = 1;
+				break;
+			case r_LabelType::HeavyArginineAndProline:
+				mk_LabeledEnvelopeCountForPeptide[ls_Peptide] = ls_Peptide.count("P") + 1;
+				break;
+			case r_LabelType::N15Labeling:
+				mk_LabeledEnvelopeCountForPeptide[ls_Peptide] = 1;
+				break;
+			default:
+				printf("Invalid label type specified!\n");
+				break;
+		}
 		for (int li_Charge = mi_MinCharge; li_Charge <= mi_MaxCharge; ++li_Charge)
 		{
 			double ld_PeptideMz = this->calculatePeptideMass(ls_Peptide, li_Charge);
-			double ld_ModMz = HEAVY_ARGININE * ls_Peptide.count("R");
+			double ld_ModMz = 0.0;
+			if (me_LabelType == r_LabelType::N15Labeling)
+			{
+				int li_NitrogenCount = 0;
+				for (int i = 0; i < ls_Peptide.length(); ++i)
+					li_NitrogenCount += mk_AminoAcidNitrogenCount[ls_Peptide.at(i).toAscii()];
+// 				printf("%d N in %s\n", li_NitrogenCount, ls_Peptide.toStdString().c_str());
+				ld_ModMz = NEUTRON * li_NitrogenCount * 0.955;
+			}
+			else
+				ld_ModMz = HEAVY_ARGININE * ls_Peptide.count("R");
 
 			double ld_Mz;
 			QString ls_Key;
@@ -185,6 +217,7 @@ void k_Quantifier::quantify(QStringList ak_SpectraFiles, QStringList ak_Peptides
 			{
 				// save unlabeled mass
 				ld_Mz = ld_PeptideMz + i * NEUTRON / li_Charge;
+// 				printf("%s (%d+): %1.6f\n", ls_Peptide.toStdString().c_str(), li_Charge, ld_Mz);
 				ls_Key = QString("%1-%2-unlabeled-%3").arg(ls_Peptide).arg(li_Charge).arg(i);
 				lk_TempList.push_back(tk_DoubleStringPair(ld_Mz, ls_Key));
 				
@@ -192,6 +225,7 @@ void k_Quantifier::quantify(QStringList ak_SpectraFiles, QStringList ak_Peptides
 				for (int k = 0; k < mk_LabeledEnvelopeCountForPeptide[ls_Peptide]; ++k)
 				{
 					ld_Mz = ld_PeptideMz + i * NEUTRON / li_Charge + (ld_ModMz + k * HEAVY_PROLINE) / li_Charge;
+// 					printf("%s* (%d+): %1.6f\n", ls_Peptide.toStdString().c_str(), li_Charge, ld_Mz);
 					ls_Key = QString("%1-%2-labeled-%3-%4").arg(ls_Peptide).arg(li_Charge).arg(k).arg(i);
 					lk_TempList.push_back(tk_DoubleStringPair(ld_Mz, ls_Key));
 				}
@@ -298,7 +332,7 @@ void k_Quantifier::quantify(QStringList ak_SpectraFiles, QStringList ak_Peptides
 
 void k_Quantifier::handleScan(r_Scan& ar_Scan)
 {
-/*	if (QVariant(ar_Scan.ms_Id).toInt() != 3894)
+/*	if (QVariant(ar_Scan.ms_Id).toInt() != 3215)
 		return;*/
 	
 	if (ar_Scan.mr_Spectrum.mi_PeaksCount == 0)
@@ -314,6 +348,7 @@ void k_Quantifier::handleScan(r_Scan& ar_Scan)
 	
 	// find all peaks in this spectrum
 	QList<r_Peak> lk_AllPeaks = k_ScanIterator::findAllPeaks(ar_Scan.mr_Spectrum);
+// 	printf("all peaks: %d\n", lk_AllPeaks.size());
 	
 	// we need at least a few peaks
 	if (lk_AllPeaks.size() < mi_WatchIsotopesCount * 2)
@@ -381,6 +416,14 @@ void k_Quantifier::handleScan(r_Scan& ar_Scan)
 		}
 		lk_Buckets = lk_NewBuckets;
 	}
+	
+/*	foreach (QString s, mk_TargetMzIndex.keys())
+	{
+		double ld_ScanMz = lk_AllPeaks[lk_PeakForTargetMz[mk_TargetMzIndex[s]]].md_PeakMz;
+		double ld_TargetMz = mk_AllTargetMasses[mk_TargetMzIndex[s]];
+		double ld_Error = fabs(ld_ScanMz - ld_TargetMz) / ld_TargetMz * 1000000.0;
+		printf("%s: %1.6f - %1.6f (%1.2f ppm)\n", s.toStdString().c_str(), ld_ScanMz, ld_TargetMz, ld_Error);
+	}*/
 	
 	// discard all target m/z matches that are bogus because
 	// they are not within the specified mass accuracy
@@ -748,7 +791,7 @@ k_Quantifier::checkResult(QHash<int, r_Peak> ak_LightPeaksInclude,
 	double ld_MinSnr = lk_Peaks.first().md_Snr;
 	for (int i = 1; i < lk_Peaks.size(); ++i)
 		ld_MinSnr = std::min<double>(ld_MinSnr, lk_Peaks[i].md_Snr);
-		
+	
 	if (ld_MinSnr < md_MinSnr)
 		return lr_Result;
 	

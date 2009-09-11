@@ -29,6 +29,7 @@ along with SimQuant.  If not, see <http://www.gnu.org/licenses/>.
 #define NEUTRON 1.002
 #define HEAVY_ARGININE 6.02013
 #define HEAVY_PROLINE 5.016775
+#define HEAVY_NITROGEN 1.003355
 
 struct r_LabelType
 {
