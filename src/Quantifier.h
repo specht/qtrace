@@ -104,7 +104,9 @@ public:
 				 double ad_MinSnr = 2.0, double ad_MassAccuracy = 5.0,
 				 double ad_ExcludeMassAccuracy = 10.0,
 				 QIODevice* ak_CsvOutDevice_ = NULL, QIODevice* ak_XhtmlOutDevice_ = NULL,
-				 bool ab_PrintStatistics = false);
+				 bool ab_PrintStatistics = false,
+				 bool ab_CheckLightForbiddenPeaks = true,
+				 bool ab_CheckHeavyForbiddenPeaks = false);
 	virtual ~k_Quantifier();
 	
 	// quantify takes a list of spectra files and a hash of (peptide => protein) entries
@@ -150,6 +152,8 @@ protected:
 	double md_ExcludeMassAccuracy;
 	double md_ElutionProfilePeakWidth;
 	bool mb_PrintStatistics;
+	bool mb_CheckLightForbiddenPeaks;
+	bool mb_CheckHeavyForbiddenPeaks;
 	QList<double> mk_AllTargetMasses;
 	QString ms_CurrentSpot;
 	QStringList mk_Peptides;

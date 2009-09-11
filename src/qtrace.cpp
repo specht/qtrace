@@ -47,6 +47,10 @@ void printUsageAndExit()
 	printf("      Enable or disable CSV output.\n");
 	printf("  --csvOutputTarget [path] (default: stdout)\n");
 	printf("      Redirect CSV output to a file. Enables CSV output.\n");
+	printf("  --checkLightForbiddenPeaks [flag] (default: yes)\n");
+	printf("      Check for light forbidden peak absence.\n");
+	printf("  --checkHeavyForbiddenPeaks [flag] (default: no)\n");
+	printf("      Check for heavy forbidden peak absence.\n");
 /*	printf("  --xhtmlOutput [flag] (default: no)\n");
 	printf("      Enable or disable XHTML output.\n");
 	printf("  --xhtmlOutputTarget [string] (default: stdout)\n");
@@ -94,6 +98,8 @@ int main(int ai_ArgumentCount, char** ac_Arguments__)
 	double ld_MassAccuracy = 5.0;
 	double ld_ExcludeMassAccruracy = 30.0;
 	bool lb_PrintStatistics = false;
+	bool lb_CheckLightForbiddenPeaks = true;
+	bool lb_CheckHeavyForbiddenPeaks = false;
 	
 	QFile lk_StdOut;
 	lk_StdOut.open(stdout, QIODevice::WriteOnly);
@@ -217,6 +223,24 @@ int main(int ai_ArgumentCount, char** ac_Arguments__)
 		lk_Arguments.removeAt(li_Index);
 	}
 	
+	li_Index = lk_Arguments.indexOf("--checkLightForbiddenPeaks");
+	if (li_Index > -1)
+	{
+		QString ls_Value = lk_Arguments[li_Index + 1];
+		lb_CheckLightForbiddenPeaks = stringToBool(ls_Value);
+		lk_Arguments.removeAt(li_Index);
+		lk_Arguments.removeAt(li_Index);
+	}
+	
+	li_Index = lk_Arguments.indexOf("--checkHeavyForbiddenPeaks");
+	if (li_Index > -1)
+	{
+		QString ls_Value = lk_Arguments[li_Index + 1];
+		lb_CheckHeavyForbiddenPeaks = stringToBool(ls_Value);
+		lk_Arguments.removeAt(li_Index);
+		lk_Arguments.removeAt(li_Index);
+	}
+	
 /*	li_Index = lk_Arguments.indexOf("--xhtmlOutput");
 	if (li_Index > -1)
 	{
@@ -248,9 +272,11 @@ int main(int ai_ArgumentCount, char** ac_Arguments__)
 	
 	//RefPtr<QIODevice> lk_pTextDevice(new QIODevice(stdout));
 	
-	k_Quantifier lk_Quantifier(le_LabelType, le_ScanType, QList<tk_IntPair>() << tk_IntPair(1, 1),
+	k_Quantifier lk_Quantifier(le_LabelType, le_ScanType,
+		QList<tk_IntPair>() << tk_IntPair(1, 1),
 		li_IsotopeCount, li_MinCharge, li_MaxCharge, ld_MinSnr, ld_MassAccuracy, 
-		ld_ExcludeMassAccruracy, lk_CsvDevice_, lk_XhtmlDevice_, lb_PrintStatistics);
+		ld_ExcludeMassAccruracy, lk_CsvDevice_, lk_XhtmlDevice_, lb_PrintStatistics,
+		lb_CheckLightForbiddenPeaks, lb_CheckHeavyForbiddenPeaks);
 		
 	QStringList lk_SpectraFiles;
 	QStringList lk_Peptides;

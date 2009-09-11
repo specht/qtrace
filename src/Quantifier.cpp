@@ -30,7 +30,8 @@ k_Quantifier::k_Quantifier(r_LabelType::Enumeration ae_LabelType,
 						   double ad_MinSnr, double ad_MassAccuracy, 
 						   double ad_ExcludeMassAccuracy,
 						   QIODevice* ak_CsvOutDevice_, QIODevice* ak_XhtmlOutDevice_,
-						   bool ab_PrintStatistics)
+						   bool ab_PrintStatistics, bool ab_CheckLightForbiddenPeaks,
+						   bool ab_CheckHeavyForbiddenPeaks)
 	: k_ScanIterator(ae_ScanType, ak_MsLevels)
 	, me_LabelType(ae_LabelType)
 	, mi_WatchIsotopesCount(ai_IsotopeCount)
@@ -43,6 +44,8 @@ k_Quantifier::k_Quantifier(r_LabelType::Enumeration ae_LabelType,
 	, md_ExcludeMassAccuracy(ad_ExcludeMassAccuracy)
 	, md_ElutionProfilePeakWidth(0.1)
 	, mb_PrintStatistics(ab_PrintStatistics)
+	, mb_CheckLightForbiddenPeaks(ab_CheckLightForbiddenPeaks)
+	, mb_CheckHeavyForbiddenPeaks(ab_CheckHeavyForbiddenPeaks)
 	, mui_QuantitationResultCount(0)
 {
 	// test parameter sanity
@@ -173,6 +176,9 @@ void k_Quantifier::quantify(QStringList ak_SpectraFiles, QStringList ak_Peptides
 	
 	printf("Looking in %s scans, expecting %d isotope peaks at a presence mass accuracy of %1.2f ppm and an absence mass accuracy of %1.2f ppm.\n",
 		lk_ScanTypes.join("/").toStdString().c_str(), mi_WatchIsotopesCount, md_MassAccuracy, md_ExcludeMassAccuracy);
+	printf("%s light forbidden peaks, %s, heavy forbidden peaks.\n",
+			mb_CheckLightForbiddenPeaks ? "Checking for" : "Ignoring",
+			mb_CheckHeavyForbiddenPeaks ? "checking for" : "ignoring");
 		
 	// determine all target m/z values
 	typedef QPair<double, QString> tk_DoubleStringPair;
@@ -332,7 +338,7 @@ void k_Quantifier::quantify(QStringList ak_SpectraFiles, QStringList ak_Peptides
 
 void k_Quantifier::handleScan(r_Scan& ar_Scan)
 {
-/*	if (QVariant(ar_Scan.ms_Id).toInt() != 3215)
+/*	if (QVariant(ar_Scan.ms_Id).toInt() != 5117)
 		return;*/
 	
 	if (ar_Scan.mr_Spectrum.mi_PeaksCount == 0)
@@ -422,7 +428,8 @@ void k_Quantifier::handleScan(r_Scan& ar_Scan)
 		double ld_ScanMz = lk_AllPeaks[lk_PeakForTargetMz[mk_TargetMzIndex[s]]].md_PeakMz;
 		double ld_TargetMz = mk_AllTargetMasses[mk_TargetMzIndex[s]];
 		double ld_Error = fabs(ld_ScanMz - ld_TargetMz) / ld_TargetMz * 1000000.0;
-		printf("%s: %1.6f - %1.6f (%1.2f ppm)\n", s.toStdString().c_str(), ld_ScanMz, ld_TargetMz, ld_Error);
+		double ld_Snr = lk_AllPeaks[lk_PeakForTargetMz[mk_TargetMzIndex[s]]].md_Snr;
+		printf("%s: %1.6f - %1.6f (%1.2f ppm, SNR %1.2f)\n", s.toStdString().c_str(), ld_ScanMz, ld_TargetMz, ld_Error, ld_Snr);
 	}*/
 	
 	// discard all target m/z matches that are bogus because
@@ -832,9 +839,16 @@ k_Quantifier::checkResult(QHash<int, r_Peak> ak_LightPeaksInclude,
 		li_HeavyPeakIncludeCount == mi_WatchIsotopesCount * mk_LabeledEnvelopeCountForPeptide[as_Peptide])
 	{
 		// both isotope envelopes are complete, we get a ratio!
-		// don't quantify if forbidden peak is present!
-		if (ak_LightPeaksExclude.contains(-1))
+		if (mb_CheckLightForbiddenPeaks && ak_LightPeaksExclude.contains(-1))
+			// don't quantify if forbidden peak is present!
 			return lr_Result;
+		if (mb_CheckHeavyForbiddenPeaks)
+		{
+			// and don't quantify if the heavy forbidden peak is present
+			for (int k = 0; k < mk_LabeledEnvelopeCountForPeptide[as_Peptide]; ++k)
+				if (ak_HeavyPeaksExclude.contains(-1 - k))
+					return lr_Result;
+		}
 		lr_Result.md_AmountUnlabeled = ld_LightSum;
 		lr_Result.md_AmountLabeled = ld_HeavySum;
 		lr_Result.md_Ratio = ld_LightSum / ld_HeavySum;
