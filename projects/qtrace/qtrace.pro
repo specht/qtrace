@@ -9,6 +9,7 @@ RESOURCES += ../../src/qtrace.qrc
 
 HEADERS += \
 	../../src/Quantifier.h \
+	../../src/Tango.h \
 
 SOURCES += \
 	../../src/Quantifier.cpp \

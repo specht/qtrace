@@ -47,6 +47,8 @@ void printUsageAndExit()
 	printf("      Enable or disable CSV output.\n");
 	printf("  --csvOutputTarget [path] (default: stdout)\n");
 	printf("      Redirect CSV output to a file. Enables CSV output.\n");
+	printf("  --xhtmlOutputTarget [path] (default: none)\n");
+	printf("      Output quantitation events as XHTML-embedded SVG to [path].\n");
 	printf("  --checkLightForbiddenPeaks [flag] (default: yes)\n");
 	printf("      Check for light forbidden peak absence.\n");
 	printf("  --checkHeavyForbiddenPeaks [flag] (default: no)\n");
@@ -57,6 +59,8 @@ void printUsageAndExit()
 	printf("      Redirect XHTML output to a file. Enables XHTML output.\n");*/
 	printf("  --statistics [flag] (default: no)\n");
 	printf("      Print details about reasons why quantitation failed in scans.\n");
+	printf("  --quiet\n");
+	printf("      Don't print status messages.\n");
 	printf("  --version\n");
 	printf("      Print version and exit.\n");
 	exit(1);
@@ -100,6 +104,7 @@ int main(int ai_ArgumentCount, char** ac_Arguments__)
 	bool lb_PrintStatistics = false;
 	bool lb_CheckLightForbiddenPeaks = true;
 	bool lb_CheckHeavyForbiddenPeaks = false;
+	bool lb_PrintStatusMessages = true;
 	
 	QFile lk_StdOut;
 	lk_StdOut.open(stdout, QIODevice::WriteOnly);
@@ -223,6 +228,16 @@ int main(int ai_ArgumentCount, char** ac_Arguments__)
 		lk_Arguments.removeAt(li_Index);
 	}
 	
+	li_Index = lk_Arguments.indexOf("--xhtmlOutputTarget");
+	if (li_Index > -1)
+	{
+		lk_pXhtmlOutFile = RefPtr<QFile>(new QFile(lk_Arguments[li_Index + 1]));
+		lk_pXhtmlOutFile->open(QIODevice::WriteOnly);
+		lk_XhtmlDevice_ = lk_pXhtmlOutFile.get_Pointer();
+		lk_Arguments.removeAt(li_Index);
+		lk_Arguments.removeAt(li_Index);
+	}
+	
 	li_Index = lk_Arguments.indexOf("--checkLightForbiddenPeaks");
 	if (li_Index > -1)
 	{
@@ -271,13 +286,20 @@ int main(int ai_ArgumentCount, char** ac_Arguments__)
 		lk_Arguments.removeAt(li_Index);
 	}
 	
+	li_Index = lk_Arguments.indexOf("--quiet");
+	if (li_Index > -1)
+	{
+		lk_Arguments.removeAt(li_Index);
+		lb_PrintStatusMessages = false;
+	}
+	
 	//RefPtr<QIODevice> lk_pTextDevice(new QIODevice(stdout));
 	
 	k_Quantifier lk_Quantifier(le_LabelType, le_ScanType,
 		QList<tk_IntPair>() << tk_IntPair(1, 1),
 		li_IsotopeCount, li_MinCharge, li_MaxCharge, ld_MinSnr, ld_MassAccuracy, 
 		ld_ExcludeMassAccruracy, lk_CsvDevice_, lk_XhtmlDevice_, lb_PrintStatistics,
-		lb_CheckLightForbiddenPeaks, lb_CheckHeavyForbiddenPeaks);
+		lb_CheckLightForbiddenPeaks, lb_CheckHeavyForbiddenPeaks, lb_PrintStatusMessages);
 		
 	QStringList lk_SpectraFiles;
 	QStringList lk_Peptides;

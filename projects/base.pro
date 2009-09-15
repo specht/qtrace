@@ -30,4 +30,4 @@ else {
 
 DESTDIR = ../../
 
-QT = core xml
+QT = core xml svg

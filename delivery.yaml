@@ -1,7 +1,7 @@
 # this is Windows ready now!!
 projects:
   - projects/qtrace
-qt: [core, xml]
+qt: [core, xml, svg]
 win32Libs: []
 versionInject:
   src/version.h: |

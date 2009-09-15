@@ -62,8 +62,8 @@ struct r_ScanQuantitationResult
 	double md_Ratio;
 	double md_Snr;
 	double md_RetentionTime;
-	QList<double> mk_UnlabeledTargetMz;
-	QList<double> mk_LabeledTargetMz;
+	QList<double> mk_TargetMz;
+	QList<double> mk_ForbiddenMz;
 	double md_MinMz;
 	double md_MaxMz;
 	int mi_Charge;
@@ -106,7 +106,8 @@ public:
 				 QIODevice* ak_CsvOutDevice_ = NULL, QIODevice* ak_XhtmlOutDevice_ = NULL,
 				 bool ab_PrintStatistics = false,
 				 bool ab_CheckLightForbiddenPeaks = true,
-				 bool ab_CheckHeavyForbiddenPeaks = false);
+				 bool ab_CheckHeavyForbiddenPeaks = false,
+				 bool ab_PrintStatusMessages = true);
 	virtual ~k_Quantifier();
 	
 	// quantify takes a list of spectra files and a hash of (peptide => protein) entries
@@ -127,8 +128,8 @@ protected:
 					 QHash<int, r_Peak> ak_HeavyPeaksExclude,
 					 r_Scan& ar_Scan, QString as_Peptide, 
 					 int ai_Charge, 
-					 QList<double> ak_UnlabeledTargetMz, 
-					 QList<double> ak_LabeledTargetMz);
+					 QList<double> ak_TargetMz, 
+					 QList<double> ak_ForbiddenMz);
 	void fitGaussian(double* a_, double* b_, double* c_, double x0, double y0, 
 					 double x1, double y1, double x2, double y2);
 	double gaussian(double x, double a, double b, double c);
@@ -154,6 +155,7 @@ protected:
 	bool mb_PrintStatistics;
 	bool mb_CheckLightForbiddenPeaks;
 	bool mb_CheckHeavyForbiddenPeaks;
+	bool mb_PrintStatusMessages;
 	QList<double> mk_AllTargetMasses;
 	QString ms_CurrentSpot;
 	QStringList mk_Peptides;
