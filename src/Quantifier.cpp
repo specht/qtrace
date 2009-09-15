@@ -176,7 +176,7 @@ void k_Quantifier::quantify(QStringList ak_SpectraFiles, QStringList ak_Peptides
 	
 	printf("Looking in %s scans, expecting %d isotope peaks at a presence mass accuracy of %1.2f ppm and an absence mass accuracy of %1.2f ppm.\n",
 		lk_ScanTypes.join("/").toStdString().c_str(), mi_WatchIsotopesCount, md_MassAccuracy, md_ExcludeMassAccuracy);
-	printf("%s light forbidden peaks, %s, heavy forbidden peaks.\n",
+	printf("%s light forbidden peaks, %s heavy forbidden peaks.\n",
 			mb_CheckLightForbiddenPeaks ? "Checking for" : "Ignoring",
 			mb_CheckHeavyForbiddenPeaks ? "checking for" : "ignoring");
 		
