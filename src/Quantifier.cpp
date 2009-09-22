@@ -222,7 +222,16 @@ void k_Quantifier::quantify(QStringList ak_SpectraFiles, QStringList ak_Peptides
 				ld_ModMz = HEAVY_NITROGEN * li_NitrogenCount;
 			}
 			else
-				ld_ModMz = HEAVY_ARGININE * ls_Peptide.count("R");
+			{
+				int li_RCount = ls_Peptide.count("R");
+				// don't add this target if no mass shift
+				// :TODO: this should be more general, like checking
+				// whether ld_ModMz is zero. But can you test a float
+				// against zero? Huh.
+				if (li_RCount == 0)
+					continue;
+				ld_ModMz = HEAVY_ARGININE * li_RCount;
+			}
 
 			double ld_Mz;
 			QString ls_Key;
