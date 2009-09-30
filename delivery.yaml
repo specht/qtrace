@@ -1,4 +1,5 @@
 # this is Windows ready now!!
+# yeah!
 projects:
   - projects/qtrace
 qt: [core, xml, svg, gui]
