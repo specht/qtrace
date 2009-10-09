@@ -254,7 +254,7 @@ void k_Quantifier::quantify(QStringList ak_SpectraFiles, QStringList ak_Peptides
 	if (mb_PrintStatusMessages)
 	{
 		if (lk_PeptidesActuallySearchedFor.empty())
-			printf("No appropriate peptides left for the search, skipping input files...\n");
+			printf("No appropriate peptides left for the search, skipping input files...");
 	}
 	else
 	{
