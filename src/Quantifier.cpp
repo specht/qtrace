@@ -167,26 +167,8 @@ QString dtos(double ad_Value)
 void k_Quantifier::quantify(QStringList ak_SpectraFiles, QStringList ak_Peptides)
 {
 	mk_Peptides = ak_Peptides;
+	QSet<QString> lk_PeptidesActuallySearchedFor;
 	
-	if (mb_PrintStatusMessages)
-	{
-		printf("Searching for %d peptide%s in %d file%s, trying charge states %d to %d.\n",
-			ak_Peptides.size(), ak_Peptides.size() != 1 ? "s" : "",
-			ak_SpectraFiles.size(), ak_SpectraFiles.size() != 1 ? "s" : "",
-			mi_MinCharge, mi_MaxCharge);
-		QStringList lk_ScanTypes;
-		if (me_ScanType & r_ScanType::MS1)
-			lk_ScanTypes << "Full";
-		if (me_ScanType & r_ScanType::SIM)
-			lk_ScanTypes << "SIM";
-		
-		printf("Looking in %s scans, expecting %d isotope peaks at a presence mass accuracy of %1.2f ppm and an absence mass accuracy of %1.2f ppm.\n",
-			lk_ScanTypes.join("/").toStdString().c_str(), mi_WatchIsotopesCount, md_MassAccuracy, md_ExcludeMassAccuracy);
-		printf("%s light forbidden peaks, %s heavy forbidden peaks.\n",
-				mb_CheckLightForbiddenPeaks ? "Checking for" : "Ignoring",
-				mb_CheckHeavyForbiddenPeaks ? "checking for" : "ignoring");
-	}
-		
 	// determine all target m/z values
 	typedef QPair<double, QString> tk_DoubleStringPair;
 	QList<tk_DoubleStringPair> lk_TempList;
@@ -220,6 +202,7 @@ void k_Quantifier::quantify(QStringList ak_SpectraFiles, QStringList ak_Peptides
 					li_NitrogenCount += mk_AminoAcidNitrogenCount[ls_Peptide.at(i).toAscii()];
 // 				printf("%d N in %s\n", li_NitrogenCount, ls_Peptide.toStdString().c_str());
 				ld_ModMz = HEAVY_NITROGEN * li_NitrogenCount;
+				lk_PeptidesActuallySearchedFor << ls_Peptide;
 			}
 			else
 			{
@@ -230,6 +213,7 @@ void k_Quantifier::quantify(QStringList ak_SpectraFiles, QStringList ak_Peptides
 				// against zero? Huh.
 				if (li_RCount == 0)
 					continue;
+				lk_PeptidesActuallySearchedFor << ls_Peptide;
 				ld_ModMz = HEAVY_ARGININE * li_RCount;
 			}
 
@@ -266,7 +250,31 @@ void k_Quantifier::quantify(QStringList ak_SpectraFiles, QStringList ak_Peptides
 			}
 		}
 	}
-
+	
+	if (mb_PrintStatusMessages)
+	{
+		if (lk_PeptidesActuallySearchedFor.empty())
+			printf("No appropriate peptides left for the search, skipping input files...\n");
+	}
+	else
+	{
+		printf("Searching for %d peptide%s in %d file%s, trying charge states %d to %d.\n",
+			lk_PeptidesActuallySearchedFor.size(), ak_Peptides.size() != 1 ? "s" : "",
+			ak_SpectraFiles.size(), ak_SpectraFiles.size() != 1 ? "s" : "",
+			mi_MinCharge, mi_MaxCharge);
+		QStringList lk_ScanTypes;
+		if (me_ScanType & r_ScanType::MS1)
+			lk_ScanTypes << "Full";
+		if (me_ScanType & r_ScanType::SIM)
+			lk_ScanTypes << "SIM";
+		
+		printf("Looking in %s scans, expecting %d isotope peaks at a presence mass accuracy of %1.2f ppm and an absence mass accuracy of %1.2f ppm.\n",
+			lk_ScanTypes.join("/").toStdString().c_str(), mi_WatchIsotopesCount, md_MassAccuracy, md_ExcludeMassAccuracy);
+		printf("%s light forbidden peaks, %s heavy forbidden peaks.\n",
+				mb_CheckLightForbiddenPeaks ? "Checking for" : "Ignoring",
+				mb_CheckHeavyForbiddenPeaks ? "checking for" : "ignoring");
+	}
+	
 	qSort(lk_TempList.begin(), lk_TempList.end(), sortByMz);
 
 	mk_AllTargetMasses = QList<double>();
@@ -297,7 +305,8 @@ void k_Quantifier::quantify(QStringList ak_SpectraFiles, QStringList ak_Peptides
 		ms_CurrentSpot = QFileInfo(ls_Path).baseName();
 		
 		// parse spot
-		this->parseFile(ls_Path);
+		if (!lk_PeptidesActuallySearchedFor.empty())
+			this->parseFile(ls_Path);
 		
 		if (mb_PrintStatusMessages)
 			printf(" done.\n");
