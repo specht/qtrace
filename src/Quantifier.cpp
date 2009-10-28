@@ -53,12 +53,12 @@ k_Quantifier::k_Quantifier(r_LabelType::Enumeration ae_LabelType,
 	, mui_QuantitationResultCount(0)
 {
 	// test parameter sanity
-	if (mi_MinCharge < 2 || mi_MinCharge > 10)
+	if (mi_MinCharge < 1)
 	{
 		printf("Error: minimum charge (%d) out of range.\n", mi_MinCharge);
 		exit(1);
 	}
-	if (mi_MaxCharge < 2 || mi_MaxCharge > 10)
+	if (mi_MaxCharge < 1)
 	{
 		printf("Error: maximum charge (%d) out of range.\n", mi_MaxCharge);
 		exit(1);
