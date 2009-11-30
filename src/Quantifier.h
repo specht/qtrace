@@ -1,25 +1,26 @@
 /*
-Copyright (c) 2007-2008 Michael Specht
+Copyright (c) 2007-2009 Michael Specht
 
-This file is part of SimQuant.
+This file is part of qTrace.
 
-SimQuant is free software: you can redistribute it and/or modify
+qTrace is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
 the Free Software Foundation, either version 3 of the License, or
 (at your option) any later version.
 
-SimQuant is distributed in the hope that it will be useful,
+qTrace is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License
-along with SimQuant.  If not, see <http://www.gnu.org/licenses/>.
+along with qTrace.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 #pragma once
 #include <QtCore>
 #include <ptb/ScanIterator.h>
+#include "IsotopeEnvelope.h"
 
 
 #define HYDROGEN 1.007947
@@ -41,25 +42,13 @@ struct r_LabelType
 	};
 };
 
-struct r_QuantitationFailureReason
-{
-	enum Enumeration {
-		NoMatchedTargetMass,
-		IsotopePeaksMissing,
-		ForbiddenPeakPresent,
-		LowSnr,
-		Success,
-		Size
-	};
-};
-
 
 struct r_ScanQuantitationResult
 {
 	bool mb_IsGood;
+    QString ms_Peptide;
 	double md_AmountUnlabeled;
 	double md_AmountLabeled;
-	double md_Ratio;
 	double md_Snr;
 	double md_RetentionTime;
 	QList<double> mk_TargetMz;
@@ -99,15 +88,16 @@ class k_Quantifier: public k_ScanIterator
 public:
 	k_Quantifier(r_LabelType::Enumeration ae_LabelType = r_LabelType::HeavyArginineAndProline,
 				 r_ScanType::Enumeration ae_ScanType = r_ScanType::All,
+                 bool ab_UseArea = true,
 				 QList<tk_IntPair> ak_MsLevels = QList<tk_IntPair>() << tk_IntPair(0, 0x10000),
 				 int ai_IsotopeCount = 3, int ai_MinCharge = 2, int ai_MaxCharge = 3, 
 				 double ad_MinSnr = 2.0, double ad_MassAccuracy = 5.0,
 				 double ad_ExcludeMassAccuracy = 10.0,
 				 QIODevice* ak_CsvOutDevice_ = NULL, QIODevice* ak_XhtmlOutDevice_ = NULL,
-				 bool ab_PrintStatistics = false,
 				 bool ab_CheckLightForbiddenPeaks = true,
 				 bool ab_CheckHeavyForbiddenPeaks = false,
-				 bool ab_PrintStatusMessages = true);
+				 bool ab_PrintStatusMessages = true,
+                 bool ab_LogScale = true);
 	virtual ~k_Quantifier();
 	
 	// quantify takes a list of spectra files and a hash of (peptide => protein) entries
@@ -133,7 +123,7 @@ protected:
 	void fitGaussian(double* a_, double* b_, double* c_, double x0, double y0, 
 					 double x1, double y1, double x2, double y2);
 	double gaussian(double x, double a, double b, double c);
-	void updateFailureReason(const QString& as_Key, r_QuantitationFailureReason::Enumeration ae_Value);
+    QHash<QString, int> compositionForPeptide(const QString& as_Peptide);
 
 /*
 	peptide:
@@ -142,32 +132,40 @@ protected:
 			certainty:
 			more info:
 */
-	int mi_WatchIsotopesCount;
 	QTextStream mk_CsvOutStream;
 	QTextStream mk_XhtmlOutStream;
 	r_LabelType::Enumeration me_LabelType;
+    bool mb_UseArea;
 	int mi_MinCharge;
 	int mi_MaxCharge;
 	double md_MinSnr;
 	double md_MassAccuracy;
 	double md_ExcludeMassAccuracy;
 	double md_ElutionProfilePeakWidth;
-	bool mb_PrintStatistics;
 	bool mb_CheckLightForbiddenPeaks;
 	bool mb_CheckHeavyForbiddenPeaks;
 	bool mb_PrintStatusMessages;
+    bool mb_LogScale;
 	QList<double> mk_AllTargetMasses;
 	QString ms_CurrentSpot;
 	QStringList mk_Peptides;
 	QHash<char, double> mk_AminoAcidWeight;
-	QHash<char, int> mk_AminoAcidNitrogenCount;
+    QHash<char, QHash<QString, int> > mk_AminoAcidComposition;
 	unsigned int mui_QuantitationResultCount;
+    
+    QHash<QString, QSet<QString> > mk_UnlabeledRequiredTargetMzForPeptideCharge;
+    QHash<QString, QStringList> mk_UnlabeledConsideredLeftTargetMzForPeptideCharge;
+    QHash<QString, QStringList> mk_UnlabeledConsideredRightTargetMzForPeptideCharge;
+    QHash<QString, QSet<QString> > mk_LabeledRequiredTargetMzForPeptideCharge;
+    QHash<QString, QStringList> mk_LabeledConsideredLeftTargetMzForPeptideCharge;
+    QHash<QString, QStringList> mk_LabeledConsideredRightTargetMzForPeptideCharge;
 	
 	// peptide-charge-label-isotope
 	QHash<QString, int> mk_TargetMzIndex;
 	
-	QHash<QString, r_QuantitationFailureReason::Enumeration> mk_ScanFailureReason;
-	QHash<QString, int> mk_LabeledEnvelopeCountForPeptide;
+    k_IsotopeEnvelope mk_IsotopeEnvelope;
+    k_IsotopeEnvelope mk_IsotopeEnvelopeHeavyN15;
+    //QHash<QString, QList<double> > mk_IsotopeEnvelopesLight;
 	
 	//QHash<QString, QList<QList<double> > > mk_ElutionProfile;
 };

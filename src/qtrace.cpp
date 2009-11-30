@@ -35,6 +35,7 @@ void printUsageAndExit()
 	printf("      RP : SILAC labeling with 13C6-arginine, additional care is taken for accidentally labeled proline residues.\n");
 	printf("      N15: N15 labeling, where every amino acid is affected.\n");
 	printf("  --scanType [full|sim|all] (default: all)\n");
+    printf("  --use [intensity|area] (default: area)\n");
 	printf("  --isotopeCount [int] (default: 3)\n");
 	printf("  --minCharge [int] (default: 2)\n");
 	printf("  --maxCharge [int] (default: 3)\n");
@@ -57,8 +58,8 @@ void printUsageAndExit()
 	printf("      Enable or disable XHTML output.\n");
 	printf("  --xhtmlOutputTarget [string] (default: stdout)\n");
 	printf("      Redirect XHTML output to a file. Enables XHTML output.\n");*/
-	printf("  --statistics [flag] (default: no)\n");
-	printf("      Print details about reasons why quantitation failed in scans.\n");
+    printf("  --logScale [flag] (default: yes)\n");
+    printf("      Use logarithmic scale in XHTML spectra.\n");
 	printf("  --quiet\n");
 	printf("      Don't print status messages.\n");
 	printf("  --version\n");
@@ -69,6 +70,7 @@ void printUsageAndExit()
 
 bool stringToBool(QString& as_String)
 {
+    as_String = as_String.toLower().trimmed();
 	if (as_String == "yes" || as_String == "true" || as_String == "on" || as_String == "enable" || as_String == "enabled")
 		return true;
 	else if (as_String == "no" || as_String == "false" || as_String == "off" || as_String == "disable" || as_String == "disabled")
@@ -95,16 +97,17 @@ int main(int ai_ArgumentCount, char** ac_Arguments__)
 
 	r_LabelType::Enumeration le_LabelType = r_LabelType::HeavyArginineAndProline;
 	r_ScanType::Enumeration le_ScanType = r_ScanType::All;
+    bool lb_UseArea = true;
 	int li_IsotopeCount = 3;
 	int li_MinCharge = 2;
 	int li_MaxCharge = 3;
 	double ld_MinSnr = 2.0;
 	double ld_MassAccuracy = 5.0;
 	double ld_ExcludeMassAccruracy = 30.0;
-	bool lb_PrintStatistics = false;
 	bool lb_CheckLightForbiddenPeaks = true;
 	bool lb_CheckHeavyForbiddenPeaks = false;
 	bool lb_PrintStatusMessages = true;
+    bool lb_LogScale = true;
 	
 	QFile lk_StdOut;
 	lk_StdOut.open(stdout, QIODevice::WriteOnly);
@@ -160,7 +163,24 @@ int main(int ai_ArgumentCount, char** ac_Arguments__)
 		}
 	}
 	
-	li_Index = lk_Arguments.indexOf("--isotopeCount");
+    li_Index = lk_Arguments.indexOf("--use");
+    if (li_Index > -1)
+    {
+        QString ls_Use = lk_Arguments[li_Index + 1];
+        lk_Arguments.removeAt(li_Index);
+        lk_Arguments.removeAt(li_Index);
+        if (ls_Use == "intensity")
+            lb_UseArea = false;
+        else if (ls_Use == "area")
+            lb_UseArea = true;
+        else
+        {
+            printf("Error: unknown 'use' parameter %s.\n", ls_Use.toStdString().c_str());
+            exit(1);
+        }
+    }
+    
+    li_Index = lk_Arguments.indexOf("--isotopeCount");
 	if (li_Index > -1)
 	{
 		li_IsotopeCount = QVariant(lk_Arguments[li_Index + 1]).toInt();
@@ -256,6 +276,15 @@ int main(int ai_ArgumentCount, char** ac_Arguments__)
 		lk_Arguments.removeAt(li_Index);
 	}
 	
+    li_Index = lk_Arguments.indexOf("--logScale");
+    if (li_Index > -1)
+    {
+        QString ls_Value = lk_Arguments[li_Index + 1];
+        lb_LogScale = stringToBool(ls_Value);
+        lk_Arguments.removeAt(li_Index);
+        lk_Arguments.removeAt(li_Index);
+    }
+    
 /*	li_Index = lk_Arguments.indexOf("--xhtmlOutput");
 	if (li_Index > -1)
 	{
@@ -277,15 +306,6 @@ int main(int ai_ArgumentCount, char** ac_Arguments__)
 	}
 	*/
 	
-	li_Index = lk_Arguments.indexOf("--printStatistics");
-	if (li_Index > -1)
-	{
-		QString ls_Value = lk_Arguments[li_Index + 1];
-		lb_PrintStatistics = stringToBool(ls_Value);
-		lk_Arguments.removeAt(li_Index);
-		lk_Arguments.removeAt(li_Index);
-	}
-	
 	li_Index = lk_Arguments.indexOf("--quiet");
 	if (li_Index > -1)
 	{
@@ -295,11 +315,14 @@ int main(int ai_ArgumentCount, char** ac_Arguments__)
 	
 	//RefPtr<QIODevice> lk_pTextDevice(new QIODevice(stdout));
 	
-	k_Quantifier lk_Quantifier(le_LabelType, le_ScanType,
-		QList<tk_IntPair>() << tk_IntPair(1, 1),
-		li_IsotopeCount, li_MinCharge, li_MaxCharge, ld_MinSnr, ld_MassAccuracy, 
-		ld_ExcludeMassAccruracy, lk_CsvDevice_, lk_XhtmlDevice_, lb_PrintStatistics,
-		lb_CheckLightForbiddenPeaks, lb_CheckHeavyForbiddenPeaks, lb_PrintStatusMessages);
+	k_Quantifier 
+        lk_Quantifier(le_LabelType, le_ScanType, lb_UseArea,
+                      QList<tk_IntPair>() << tk_IntPair(1, 1),
+                      li_IsotopeCount, li_MinCharge, li_MaxCharge, ld_MinSnr, 
+                      ld_MassAccuracy, ld_ExcludeMassAccruracy, lk_CsvDevice_, 
+                      lk_XhtmlDevice_, lb_CheckLightForbiddenPeaks, 
+                      lb_CheckHeavyForbiddenPeaks, 
+                      lb_PrintStatusMessages, lb_LogScale);
 		
 	QStringList lk_SpectraFiles;
 	QStringList lk_Peptides;

@@ -1,20 +1,20 @@
 /*
-Copyright (c) 2007-2008 Michael Specht
+Copyright (c) 2007-2009 Michael Specht
 
-This file is part of SimQuant.
+This file is part of qTrace.
 
-SimQuant is free software: you can redistribute it and/or modify
+qTrace is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
 the Free Software Foundation, either version 3 of the License, or
 (at your option) any later version.
 
-SimQuant is distributed in the hope that it will be useful,
+qTrace is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License
-along with SimQuant.  If not, see <http://www.gnu.org/licenses/>.
+along with qTrace.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 #include "Quantifier.h"
@@ -24,20 +24,24 @@ along with SimQuant.  If not, see <http://www.gnu.org/licenses/>.
 #include <limits>
 #include "Tango.h"
 
+#define REQUIRE_ABUNDANCE 0.5
+#define CONSIDER_ABUNDANCE 0.1
+
 
 k_Quantifier::k_Quantifier(r_LabelType::Enumeration ae_LabelType,
 						   r_ScanType::Enumeration ae_ScanType,
+                           bool ab_UseArea,
 						   QList<tk_IntPair> ak_MsLevels,
 						   int ai_IsotopeCount, int ai_MinCharge, int ai_MaxCharge, 
 						   double ad_MinSnr, double ad_MassAccuracy, 
 						   double ad_ExcludeMassAccuracy,
 						   QIODevice* ak_CsvOutDevice_, QIODevice* ak_XhtmlOutDevice_,
-						   bool ab_PrintStatistics, bool ab_CheckLightForbiddenPeaks,
+						   bool ab_CheckLightForbiddenPeaks,
 						   bool ab_CheckHeavyForbiddenPeaks,
-						   bool ab_PrintStatusMessages)
+						   bool ab_PrintStatusMessages, bool ab_LogScale)
 	: k_ScanIterator(ae_ScanType, ak_MsLevels)
 	, me_LabelType(ae_LabelType)
-	, mi_WatchIsotopesCount(ai_IsotopeCount)
+    , mb_UseArea(ab_UseArea)
 	, mk_CsvOutStream(ak_CsvOutDevice_)
 	, mk_XhtmlOutStream(ak_XhtmlOutDevice_)
 	, mi_MinCharge(ai_MinCharge)
@@ -46,10 +50,10 @@ k_Quantifier::k_Quantifier(r_LabelType::Enumeration ae_LabelType,
 	, md_MassAccuracy(ad_MassAccuracy)
 	, md_ExcludeMassAccuracy(ad_ExcludeMassAccuracy)
 	, md_ElutionProfilePeakWidth(0.1)
-	, mb_PrintStatistics(ab_PrintStatistics)
 	, mb_CheckLightForbiddenPeaks(ab_CheckLightForbiddenPeaks)
 	, mb_CheckHeavyForbiddenPeaks(ab_CheckHeavyForbiddenPeaks)
 	, mb_PrintStatusMessages(ab_PrintStatusMessages)
+    , mb_LogScale(ab_LogScale)
 	, mui_QuantitationResultCount(0)
 {
 	// test parameter sanity
@@ -80,34 +84,47 @@ k_Quantifier::k_Quantifier(r_LabelType::Enumeration ae_LabelType,
 	}
 	
 	Q_INIT_RESOURCE(qtrace);
-	
-	QFile lk_File(":res/AminoAcids.csv");
-	lk_File.open(QFile::ReadOnly);
+    
+	QFile lk_File(":ext/proteomics-knowledge-base/amino-acids.csv");
+	if (!lk_File.open(QFile::ReadOnly))
+    {
+        fprintf(stderr, "Error: Unable to open amino-acids.csv.\n");
+        exit(1);
+    }
 	QTextStream lk_TextStream(&lk_File);
 
-	lk_TextStream.readLine();
+    QString ls_Header = lk_TextStream.readLine().toLower().trimmed();
+    QStringList lk_Header = ls_Header.split(",");
+    int li_LetterIndex = lk_Header.indexOf("single letter code");
+    int li_CompositionIndex = lk_Header.indexOf("composition");
+    int li_MassIndex = lk_Header.indexOf("monoisotopic mass");
+    if (li_LetterIndex < 0 || li_CompositionIndex < 0 || li_MassIndex < 0)
+    {
+        fprintf(stderr, "Error: Something is wrong with amino-acids.csv.\n");
+        exit(1);
+    }
 	while (!lk_TextStream.atEnd())
 	{
 		QString ls_Line = lk_TextStream.readLine().trimmed();
-		if (ls_Line.isEmpty() || ls_Line.startsWith("#"))
+		if (ls_Line.isEmpty())
 			continue;
 
 		QStringList lk_List;
-		foreach (QString ls_Entry, ls_Line.split(QChar(';')))
+		foreach (QString ls_Entry, ls_Line.split(QChar(',')))
 		{
 			if (ls_Entry.at(0) == QChar('"') && ls_Entry.at(ls_Entry.length() - 1) == QChar('"'))
 				ls_Entry = ls_Entry.mid(1, ls_Entry.length() - 2);
 			lk_List << ls_Entry;
 		}
-		char lc_AminoAcid = lk_List[3][0].toAscii();
-		mk_AminoAcidWeight[lc_AminoAcid] = lk_List[4].toDouble();
-		QString ls_Composition = lk_List[6];
+		char lc_AminoAcid = lk_List[li_LetterIndex][0].toAscii();
+		mk_AminoAcidWeight[lc_AminoAcid] = lk_List[li_MassIndex].toDouble();
+		QString ls_Composition = lk_List[li_CompositionIndex];
 		ls_Composition.remove("\"");
-		QHash<char, int> lk_ElementCount;
+		QHash<QString, int> lk_ElementCount;
 		while (!ls_Composition.isEmpty())
 		{
 			char lc_Element = ls_Composition.at(0).toAscii();
-			lk_ElementCount[lc_Element] = 1;
+			lk_ElementCount[QString(lc_Element)] = 1;
 			ls_Composition = ls_Composition.right(ls_Composition.length() - 1);
 			if (ls_Composition.isEmpty())
 				break;
@@ -122,14 +139,15 @@ k_Quantifier::k_Quantifier(r_LabelType::Enumeration ae_LabelType,
 				lc_NextChar = ls_Composition.at(0).toAscii();
 			}
 			if (!ls_Number.isEmpty())
-				lk_ElementCount[lc_Element] = ls_Number.toInt();
+				lk_ElementCount[QString(lc_Element)] = ls_Number.toInt();
 		}
-		int li_NitrogenCount = 0;
-		if (lk_ElementCount.contains('N'))
-			li_NitrogenCount = lk_ElementCount['N'];
-		mk_AminoAcidNitrogenCount[lc_AminoAcid] = li_NitrogenCount;
+        mk_AminoAcidComposition[lc_AminoAcid] = lk_ElementCount;
 	}
 	lk_File.close();
+    
+    QHash<QString, QList<double> > lk_HeavyN15Abundances;
+    lk_HeavyN15Abundances["N"] = QList<double>() << 0.05 << 0.95;
+    mk_IsotopeEnvelopeHeavyN15 = k_IsotopeEnvelope(lk_HeavyN15Abundances);
 }
 
 
@@ -168,89 +186,119 @@ void k_Quantifier::quantify(QStringList ak_SpectraFiles, QStringList ak_Peptides
 {
 	mk_Peptides = ak_Peptides;
 	QSet<QString> lk_PeptidesActuallySearchedFor;
-	
-	// determine all target m/z values
-	typedef QPair<double, QString> tk_DoubleStringPair;
-	QList<tk_DoubleStringPair> lk_TempList;
-	for (int li_PeptideIndex = 0; li_PeptideIndex < mk_Peptides.size(); ++li_PeptideIndex)
-	{
-		QString ls_Peptide = mk_Peptides[li_PeptideIndex];
-		switch (me_LabelType)
-		{
-			case r_LabelType::HeavyArginine:
-				mk_LabeledEnvelopeCountForPeptide[ls_Peptide] = 1;
-				break;
-			case r_LabelType::HeavyArginineAndProline:
-				mk_LabeledEnvelopeCountForPeptide[ls_Peptide] = ls_Peptide.count("P") + 1;
-				break;
-			case r_LabelType::N15Labeling:
-				mk_LabeledEnvelopeCountForPeptide[ls_Peptide] = 1;
-				break;
-			default:
-				printf("Error: Invalid label type specified!\n");
-				exit(1);
-				break;
-		}
-		for (int li_Charge = mi_MinCharge; li_Charge <= mi_MaxCharge; ++li_Charge)
-		{
-			double ld_PeptideMz = this->calculatePeptideMass(ls_Peptide, li_Charge);
-			double ld_ModMz = 0.0;
-			if (me_LabelType == r_LabelType::N15Labeling)
-			{
-				int li_NitrogenCount = 0;
-				for (int i = 0; i < ls_Peptide.length(); ++i)
-					li_NitrogenCount += mk_AminoAcidNitrogenCount[ls_Peptide.at(i).toAscii()];
-// 				printf("%d N in %s\n", li_NitrogenCount, ls_Peptide.toStdString().c_str());
-				ld_ModMz = HEAVY_NITROGEN * li_NitrogenCount;
-				lk_PeptidesActuallySearchedFor << ls_Peptide;
-			}
-			else
-			{
-				int li_RCount = ls_Peptide.count("R");
-				// don't add this target if no mass shift
-				// :TODO: this should be more general, like checking
-				// whether ld_ModMz is zero. But can you test a float
-				// against zero? Huh.
-				if (li_RCount == 0)
-					continue;
-				lk_PeptidesActuallySearchedFor << ls_Peptide;
-				ld_ModMz = HEAVY_ARGININE * li_RCount;
-			}
+    
+    typedef QPair<double, QString> tk_DoubleStringPair;
+    QList<tk_DoubleStringPair> lk_TempList;
+    // determine all peptide isotope envelopes and target m/z values
+    for (int li_PeptideIndex = 0; li_PeptideIndex < mk_Peptides.size(); ++li_PeptideIndex)
+    {
+        QString ls_Peptide = mk_Peptides[li_PeptideIndex];
+        if (me_LabelType == r_LabelType::HeavyArginine || me_LabelType == r_LabelType::HeavyArginineAndProline)
+        {
+            if (ls_Peptide.count("R") == 0)
+                continue;
+        }
+        lk_PeptidesActuallySearchedFor << ls_Peptide;
+        
+        QHash<QString, int> lk_Composition = compositionForPeptide(ls_Peptide);
+        tk_IsotopeEnvelope lk_UnchargedIsotopeEnvelope = mk_IsotopeEnvelope.isotopeEnvelopeForComposition(lk_Composition);
+        double ld_UnchargedPeptideMass = mk_IsotopeEnvelope.massForComposition(lk_Composition);
+        tk_IsotopeEnvelope lk_IsotopeEnvelope = lk_UnchargedIsotopeEnvelope;
+        tk_IsotopeEnvelope lk_UnchargedIsotopeEnvelopeN15;
+        tk_IsotopeEnvelope lk_IsotopeEnvelopeN15;
+        if (me_LabelType == r_LabelType::N15Labeling)
+        {
+            lk_UnchargedIsotopeEnvelopeN15 = mk_IsotopeEnvelopeHeavyN15.isotopeEnvelopeForComposition(lk_Composition);
+            lk_IsotopeEnvelopeN15 = lk_UnchargedIsotopeEnvelopeN15;
+        }
+        for (int li_Charge = 1; li_Charge <= mi_MaxCharge; ++li_Charge)
+        {
+            QString ls_PeptideChargeKey = QString("%1-%2").arg(ls_Peptide).arg(li_Charge);
+            double ld_Mass = ld_UnchargedPeptideMass + mk_IsotopeEnvelope.mk_BaseIsotopeMass["H"] * li_Charge;
+            lk_IsotopeEnvelope = mk_IsotopeEnvelope.add(lk_IsotopeEnvelope, mk_IsotopeEnvelope.mk_ElementEnvelopes["H"].first());
+            if (me_LabelType == r_LabelType::N15Labeling)
+                lk_IsotopeEnvelopeN15 = mk_IsotopeEnvelopeHeavyN15.add(lk_IsotopeEnvelopeN15, mk_IsotopeEnvelopeHeavyN15.mk_ElementEnvelopes["H"].first());
+            
+            if (li_Charge >= mi_MinCharge && li_Charge <= mi_MaxCharge)
+            {
+//                  fprintf(stderr, "%s (%d+)\n", ls_Peptide.toStdString().c_str(), li_Charge);
+                tk_IsotopeEnvelope lk_NormalizedEnvelope = mk_IsotopeEnvelope.normalize(lk_IsotopeEnvelope);
 
-			double ld_Mz;
-			QString ls_Key;
-			
-			for (int i = 0; i < mi_WatchIsotopesCount; ++i)
-			{
-				// save unlabeled mass
-				ld_Mz = ld_PeptideMz + i * NEUTRON / li_Charge;
-// 				printf("%s (%d+): %1.6f\n", ls_Peptide.toStdString().c_str(), li_Charge, ld_Mz);
-				ls_Key = QString("%1-%2-unlabeled-%3").arg(ls_Peptide).arg(li_Charge).arg(i);
-				lk_TempList.push_back(tk_DoubleStringPair(ld_Mz, ls_Key));
-				
-				// save labeled mass
-				for (int k = 0; k < mk_LabeledEnvelopeCountForPeptide[ls_Peptide]; ++k)
-				{
-					ld_Mz = ld_PeptideMz + i * NEUTRON / li_Charge + (ld_ModMz + k * HEAVY_PROLINE) / li_Charge;
-// 					printf("%s* (%d+): %1.6f\n", ls_Peptide.toStdString().c_str(), li_Charge, ld_Mz);
-					ls_Key = QString("%1-%2-labeled-%3-%4").arg(ls_Peptide).arg(li_Charge).arg(k).arg(i);
-					lk_TempList.push_back(tk_DoubleStringPair(ld_Mz, ls_Key));
-				}
-			}
-			// save forbidden peak (one to the left from the unlabeled A+0 peak)
-			ld_Mz = ld_PeptideMz - NEUTRON / li_Charge;
-			ls_Key = QString("%1-%2-forbidden").arg(ls_Peptide).arg(li_Charge);
-			lk_TempList.push_back(tk_DoubleStringPair(ld_Mz, ls_Key));
-			// save labeled forbidden peak (one to the left from the labeled A+0 peak)
-			for (int k = 0; k < mk_LabeledEnvelopeCountForPeptide[ls_Peptide]; ++k)
-			{
-				ld_Mz = ld_PeptideMz - NEUTRON / li_Charge + (ld_ModMz + k * HEAVY_PROLINE) / li_Charge;
-				ls_Key = QString("%1-%2-forbidden-labeled-%3").arg(ls_Peptide).arg(li_Charge).arg(k);
-				lk_TempList.push_back(tk_DoubleStringPair(ld_Mz, ls_Key));
-			}
-		}
-	}
-	
+                // store unlabeled isotope envelope
+                bool lb_SeenRequired = false;
+                for (int li_Isotope = 0; li_Isotope < lk_NormalizedEnvelope.size(); ++li_Isotope)
+                {
+                    if (lk_NormalizedEnvelope[li_Isotope].first >= CONSIDER_ABUNDANCE)
+                    {
+                        double ld_Mz = (ld_Mass + lk_NormalizedEnvelope[li_Isotope].second) / li_Charge;
+                        // peptide-charge-label-isotope
+                        QString ls_Key = QString("%1-%2-0-%3").arg(ls_Peptide).arg(li_Charge).arg(li_Isotope);
+                        lk_TempList.push_back(tk_DoubleStringPair(ld_Mz, ls_Key));
+                        
+                        if (lk_NormalizedEnvelope[li_Isotope].first >= REQUIRE_ABUNDANCE)
+                        {
+                            mk_UnlabeledRequiredTargetMzForPeptideCharge[ls_PeptideChargeKey] << ls_Key;
+                            lb_SeenRequired = true;
+                        }
+                        else
+                        {
+                            if (!lb_SeenRequired)
+                                mk_UnlabeledConsideredLeftTargetMzForPeptideCharge[ls_PeptideChargeKey].insert(0, ls_Key);
+                            else
+                                mk_UnlabeledConsideredRightTargetMzForPeptideCharge[ls_PeptideChargeKey].append(ls_Key);
+                        }
+
+/*                        fprintf(stderr, "A+%d %c %9.5f / %9.5f\n", li_Isotope, 
+                                lk_NormalizedEnvelope[li_Isotope].first >= REQUIRE_ABUNDANCE ? '*' : lk_NormalizedEnvelope[li_Isotope].first >= CONSIDER_ABUNDANCE ? '+' : ' ', 
+                                lk_NormalizedEnvelope[li_Isotope].first, ld_Mz);*/
+                    }
+                }
+                
+                // store labeled isotope envelope
+                switch (me_LabelType)
+                {
+                    case r_LabelType::N15Labeling:
+                    {
+                        tk_IsotopeEnvelope lk_NormalizedEnvelopeN15 = mk_IsotopeEnvelopeHeavyN15.normalize(lk_IsotopeEnvelopeN15);
+                        bool lb_SeenRequired = false;
+                        for (int li_Isotope = 0; li_Isotope < lk_NormalizedEnvelopeN15.size(); ++li_Isotope)
+                        {
+                            if (lk_NormalizedEnvelopeN15[li_Isotope].first >= CONSIDER_ABUNDANCE)
+                            {
+                                double ld_Mz = (ld_Mass + lk_NormalizedEnvelopeN15[li_Isotope].second) / li_Charge;
+                                // peptide-charge-label-isotope
+                                QString ls_Key = QString("%1-%2-1-%3").arg(ls_Peptide).arg(li_Charge).arg(li_Isotope);
+                                lk_TempList.push_back(tk_DoubleStringPair(ld_Mz, ls_Key));
+
+                                if (lk_NormalizedEnvelopeN15[li_Isotope].first >= REQUIRE_ABUNDANCE)
+                                {
+                                    mk_LabeledRequiredTargetMzForPeptideCharge[ls_PeptideChargeKey] << ls_Key;
+                                    lb_SeenRequired = true;
+                                }
+                                else
+                                {
+                                    if (!lb_SeenRequired)
+                                        mk_LabeledConsideredLeftTargetMzForPeptideCharge[ls_PeptideChargeKey].insert(0, ls_Key);
+                                    else
+                                        mk_LabeledConsideredRightTargetMzForPeptideCharge[ls_PeptideChargeKey].append(ls_Key);
+                                }
+
+/*                                fprintf(stderr, "A*+%d %c %9.5f / %9.5f\n", li_Isotope, 
+                                        lk_NormalizedEnvelopeN15[li_Isotope].first > REQUIRE_ABUNDANCE ? '*' : lk_NormalizedEnvelopeN15[li_Isotope].first > CONSIDER_ABUNDANCE ? '+' : ' ', 
+                                        lk_NormalizedEnvelopeN15[li_Isotope].first, ld_Mz);*/
+                            }
+                        }
+                        break;
+                    }
+                    default:
+                        printf("Error: Invalid label type specified!\n");
+                        exit(1);
+                        break;
+                }
+            }
+        }
+    }
+    
 	if (mb_PrintStatusMessages)
 	{
 		if (lk_PeptidesActuallySearchedFor.empty())
@@ -268,8 +316,8 @@ void k_Quantifier::quantify(QStringList ak_SpectraFiles, QStringList ak_Peptides
 		if (me_ScanType & r_ScanType::SIM)
 			lk_ScanTypes << "SIM";
 		
-		printf("Looking in %s scans, expecting %d isotope peaks at a presence mass accuracy of %1.2f ppm and an absence mass accuracy of %1.2f ppm.\n",
-			lk_ScanTypes.join("/").toStdString().c_str(), mi_WatchIsotopesCount, md_MassAccuracy, md_ExcludeMassAccuracy);
+		printf("Looking in %s scans, presence mass accuracy is %1.2f ppm and an absence mass accuracy is %1.2f ppm.\n",
+			lk_ScanTypes.join("/").toStdString().c_str(), md_MassAccuracy, md_ExcludeMassAccuracy);
 		printf("%s light forbidden peaks, %s heavy forbidden peaks.\n",
 				mb_CheckLightForbiddenPeaks ? "Checking for" : "Ignoring",
 				mb_CheckHeavyForbiddenPeaks ? "checking for" : "ignoring");
@@ -301,7 +349,6 @@ void k_Quantifier::quantify(QStringList ak_SpectraFiles, QStringList ak_Peptides
 	// parse all bands
 	foreach (QString ls_Path, ak_SpectraFiles)
 	{
-		mk_ScanFailureReason.clear();
 		ms_CurrentSpot = QFileInfo(ls_Path).baseName();
 		
 		// parse spot
@@ -310,46 +357,6 @@ void k_Quantifier::quantify(QStringList ak_SpectraFiles, QStringList ak_Peptides
 		
 		if (mb_PrintStatusMessages)
 			printf(" done.\n");
-		
-		if (mb_PrintStatistics)
-		{
-			// print failure evaluation
-			QHash<r_QuantitationFailureReason::Enumeration, int> lk_Reasons;
-			foreach (QString ls_Key, mk_ScanFailureReason.keys())
-			{
-				r_QuantitationFailureReason::Enumeration le_Reason = mk_ScanFailureReason[ls_Key];
-				if (!lk_Reasons.contains(le_Reason))
-					lk_Reasons[le_Reason] = 0;
-				++lk_Reasons[le_Reason];
-			}
-			for (int i = 0; i < r_QuantitationFailureReason::Size; ++i)
-			{
-				QString ls_Description;
-				r_QuantitationFailureReason::Enumeration le_Reason = (r_QuantitationFailureReason::Enumeration)i;
-				switch (le_Reason)
-				{
-					case r_QuantitationFailureReason::NoMatchedTargetMass:
-						ls_Description = "No target mass could be matched within the specified mass accuracy.";
-						break;
-					case r_QuantitationFailureReason::IsotopePeaksMissing:
-						ls_Description = "One or more isotope peaks were missing.";
-						break;
-					case r_QuantitationFailureReason::ForbiddenPeakPresent:
-						ls_Description = "A forbidden peak (left from the unlabeled ion series) was present.";
-						break;
-					case r_QuantitationFailureReason::LowSnr:
-						ls_Description = "The signal to noise ratio was too low.";
-						break;
-					case r_QuantitationFailureReason::Success:
-						ls_Description = "A peptide was successfully quantified.";
-						break;
-				}
-				int li_Count = 0;
-				if (lk_Reasons.contains(le_Reason))
-					li_Count = lk_Reasons[le_Reason];
-				printf("%6d %s\n", li_Count, ls_Description.toStdString().c_str());
-			}
-		}
 	}
 
 	if (mk_XhtmlOutStream.device())
@@ -374,18 +381,12 @@ void k_Quantifier::handleScan(r_Scan& ar_Scan)
 		return;
 	}
 	
-	updateFailureReason(ar_Scan.ms_Id, r_QuantitationFailureReason::NoMatchedTargetMass);
-	
 	QHash<QString, int> lk_TargetPeakStartIndex;
 	QHash<QString, int> lk_TargetPeakEndIndex;
 	
 	// find all peaks in this spectrum
 	QList<r_Peak> lk_AllPeaks = k_ScanIterator::findAllPeaks(ar_Scan.mr_Spectrum);
 // 	printf("all peaks: %d\n", lk_AllPeaks.size());
-	
-	// we need at least a few peaks
-	if (lk_AllPeaks.size() < mi_WatchIsotopesCount * 2)
-		return;
 	
 	// match all target m/z values simultaneously to this spectrum's peaks
 	// create root bucket
@@ -471,14 +472,143 @@ void k_Quantifier::handleScan(r_Scan& ar_Scan)
 		double ld_MzError = fabs(ld_TargetMz - ld_PeakMz);
 		double ld_MaxMzError = ld_TargetMz * md_MassAccuracy / 1000000.0;
 		if (ld_MzError <= ld_MaxMzError)
-		{
 			lk_IncludePeakForTargetMz[li_TargetMzIndex] = lk_PeakForTargetMz[li_TargetMzIndex];
-			updateFailureReason(ar_Scan.ms_Id, r_QuantitationFailureReason::IsotopePeaksMissing);
-		}
 		ld_MaxMzError = ld_TargetMz * md_ExcludeMassAccuracy / 1000000.0;
 		if (ld_MzError <= ld_MaxMzError)
 			lk_ExcludePeakForTargetMz[li_TargetMzIndex] = lk_PeakForTargetMz[li_TargetMzIndex];
 	}
+
+    QSet<QString> lk_AvailableIncludePeaks;
+    foreach (QString ls_Key, mk_TargetMzIndex.keys())
+        if (lk_IncludePeakForTargetMz.contains(mk_TargetMzIndex[ls_Key]))
+            lk_AvailableIncludePeaks << ls_Key;
+    
+    foreach (QString ls_Peptide, mk_Peptides)
+    {
+        for (int li_Charge = mi_MinCharge; li_Charge <= mi_MaxCharge; ++li_Charge)
+        {
+            QString ls_PeptideChargeKey = QString("%1-%2").arg(ls_Peptide).arg(li_Charge);
+            QSet<QString> lk_InterestingKeys;
+            lk_InterestingKeys |= mk_UnlabeledRequiredTargetMzForPeptideCharge[ls_PeptideChargeKey];
+            lk_InterestingKeys |= mk_UnlabeledConsideredLeftTargetMzForPeptideCharge[ls_PeptideChargeKey].toSet();
+            lk_InterestingKeys |= mk_UnlabeledConsideredRightTargetMzForPeptideCharge[ls_PeptideChargeKey].toSet();
+            lk_InterestingKeys |= mk_LabeledRequiredTargetMzForPeptideCharge[ls_PeptideChargeKey];
+            lk_InterestingKeys |= mk_LabeledConsideredLeftTargetMzForPeptideCharge[ls_PeptideChargeKey].toSet();
+            lk_InterestingKeys |= mk_LabeledConsideredRightTargetMzForPeptideCharge[ls_PeptideChargeKey].toSet();
+            double ld_MinMz = mk_AllTargetMasses[mk_TargetMzIndex[lk_InterestingKeys.toList().first()]];
+            double ld_MaxMz = ld_MinMz;
+            foreach (QString ls_Key, lk_InterestingKeys)
+            {
+                double ld_Mz = mk_AllTargetMasses[mk_TargetMzIndex[ls_Key]];
+                ld_MinMz = std::min<double>(ld_MinMz, ld_Mz);
+                ld_MaxMz = std::max<double>(ld_MaxMz, ld_Mz);
+            }
+            double ld_MzBorder = (ld_MaxMz - ld_MinMz) * 0.01;
+            ld_MinMz -= 1.0 / li_Charge;
+            ld_MinMz -= ld_MzBorder;
+            ld_MaxMz += ld_MzBorder;
+            QSet<QString> lk_RequiredUnlabeledKeys = mk_UnlabeledRequiredTargetMzForPeptideCharge[ls_PeptideChargeKey];
+            QSet<QString> lk_RequiredLabeledKeys = mk_LabeledRequiredTargetMzForPeptideCharge[ls_PeptideChargeKey];
+            bool lb_FoundLightEnvelope = (lk_RequiredUnlabeledKeys & lk_AvailableIncludePeaks).size() == lk_RequiredUnlabeledKeys.size();
+            bool lb_FoundHeavyEnvelope = (lk_RequiredLabeledKeys & lk_AvailableIncludePeaks).size() == lk_RequiredLabeledKeys.size();
+            if (lb_FoundLightEnvelope || lb_FoundHeavyEnvelope)
+            {
+                // oy, we found all required peaks of at least one state!
+                printf("%s %d+ %d %d\n", ls_Peptide.toStdString().c_str(),
+                       li_Charge, lb_FoundLightEnvelope, lb_FoundHeavyEnvelope);
+                
+                QSet<QString> lk_UnlabeledKeys;
+                QSet<QString> lk_LabeledKeys;
+                // if we found the light envelope, expand to left and right
+                if (lb_FoundLightEnvelope)
+                {
+                    lk_UnlabeledKeys = lk_RequiredUnlabeledKeys;
+                    foreach (QString ls_Key, mk_UnlabeledConsideredLeftTargetMzForPeptideCharge[ls_PeptideChargeKey])
+                    {
+                        if (lk_AvailableIncludePeaks.contains(ls_Key))
+                            lk_UnlabeledKeys << ls_Key;
+                        else
+                            break;
+                    }
+                    foreach (QString ls_Key, mk_UnlabeledConsideredRightTargetMzForPeptideCharge[ls_PeptideChargeKey])
+                    {
+                        if (lk_AvailableIncludePeaks.contains(ls_Key))
+                            lk_UnlabeledKeys << ls_Key;
+                        else
+                            break;
+                    }
+                }
+                // if we found the heavy envelope, expand to left and right
+                if (lb_FoundHeavyEnvelope)
+                {
+                    lk_LabeledKeys = lk_RequiredLabeledKeys;
+                    foreach (QString ls_Key, mk_LabeledConsideredLeftTargetMzForPeptideCharge[ls_PeptideChargeKey])
+                    {
+                        if (lk_AvailableIncludePeaks.contains(ls_Key))
+                            lk_LabeledKeys << ls_Key;
+                        else
+                            break;
+                    }
+                    foreach (QString ls_Key, mk_LabeledConsideredRightTargetMzForPeptideCharge[ls_PeptideChargeKey])
+                    {
+                        if (lk_AvailableIncludePeaks.contains(ls_Key))
+                            lk_LabeledKeys << ls_Key;
+                        else
+                            break;
+                    }
+                }
+                
+                r_ScanQuantitationResult lr_ScanResult;
+                lr_ScanResult.mb_IsGood = true;
+                lr_ScanResult.ms_Peptide = ls_Peptide;
+                lr_ScanResult.mi_Charge = li_Charge;
+                lr_ScanResult.md_AmountUnlabeled = 1.0;
+                lr_ScanResult.md_AmountLabeled = 1.0;
+                lr_ScanResult.md_Snr = 666.0;
+                lr_ScanResult.md_RetentionTime = ar_Scan.md_RetentionTime;
+                lr_ScanResult.md_MinMz = ld_MinMz;
+                lr_ScanResult.md_MaxMz = ld_MaxMz;
+                
+                foreach (QString ls_Key, lk_UnlabeledKeys)
+                {
+                    int li_TargetMzIndex = mk_TargetMzIndex[ls_Key];
+                    lr_ScanResult.mk_UnlabeledPeaks.append(lk_AllPeaks[lk_PeakForTargetMz[li_TargetMzIndex]]);
+                }
+                foreach (QString ls_Key, lk_LabeledKeys)
+                {
+                    int li_TargetMzIndex = mk_TargetMzIndex[ls_Key];
+                    lr_ScanResult.mk_LabeledPeaks.append(lk_AllPeaks[lk_PeakForTargetMz[li_TargetMzIndex]]);
+                }
+                
+
+                
+                if (mk_XhtmlOutStream.device())
+                {
+                    mk_XhtmlOutStream << QString("\n<!-- BEGIN PEPTIDE %1 -->\n").arg(ls_Peptide); 
+                    mk_XhtmlOutStream << "<tr>"
+                        << "<td>" << ms_CurrentSpot << "</td>"
+                        << "<td>" << ar_Scan.ms_Id << "</td>"
+                        << "<td>" << ls_Peptide << "</td>"
+                        << "<td>" << lr_ScanResult.md_AmountUnlabeled << "</td>"
+                        << "<td>" << lr_ScanResult.md_AmountLabeled << "</td>"
+                        << "<td>" << ar_Scan.md_RetentionTime << "</td>"
+                        << "<td>" << lr_ScanResult.mi_Charge << "</td>"
+                        << "<td>" << ar_Scan.ms_FilterLine << "</td>"
+                        << "<td>" << lr_ScanResult.md_Snr << "</td>"
+                        << "</tr>"
+                        << endl;
+                    QString ls_Svg = this->renderScanAsSvg(ar_Scan, lr_ScanResult);
+                    ls_Svg.remove(QRegExp("<\\?xml.+\\?>"));
+                    ls_Svg.replace(QRegExp("width=\\\"[^\\\"]*\\\"\\s+height=\\\"[^\\\"]*\\\""), "width='950' height='238'");
+                    mk_XhtmlOutStream << "<div style='background-color: #fff;' width='950' height='238'>";
+                    mk_XhtmlOutStream << ls_Svg;
+                    mk_XhtmlOutStream << "</div>" << endl;
+                    mk_XhtmlOutStream << QString("\n<!-- END PEPTIDE %1 -->\n").arg(ls_Peptide); 
+                }
+            }
+        }
+    }
+    return;
 	
 	// now check for each peptide/charge whether all peaks are there
 	foreach (QString ls_Peptide, mk_Peptides)
@@ -494,7 +624,7 @@ void k_Quantifier::handleScan(r_Scan& ar_Scan)
 			
 			QList<double> lk_ForbiddenMz;
 			
-			for (int li_Isotope = 0; li_Isotope < mi_WatchIsotopesCount; ++li_Isotope)
+/*			for (int li_Isotope = 0; li_Isotope < mi_WatchIsotopesCount; ++li_Isotope)
 			{
 				QString ls_Key = QString("%1-%2-unlabeled-%3").
 					arg(ls_Peptide).arg(li_Charge).arg(li_Isotope);
@@ -504,8 +634,8 @@ void k_Quantifier::handleScan(r_Scan& ar_Scan)
 					lk_LightPeaksInclude[li_Isotope] = lk_AllPeaks[lk_IncludePeakForTargetMz[li_TargetMzIndex]];
 				if (lk_ExcludePeakForTargetMz.contains(li_TargetMzIndex))
 					lk_LightPeaksExclude[li_Isotope] = lk_AllPeaks[lk_ExcludePeakForTargetMz[li_TargetMzIndex]];
-			} 
-			for (int k = 0; k < mk_LabeledEnvelopeCountForPeptide[ls_Peptide]; ++k)
+			} */
+/*			for (int k = 0; k < mk_LabeledEnvelopeCountForPeptide[ls_Peptide]; ++k)
 			{
 				for (int li_Isotope = 0; li_Isotope < mi_WatchIsotopesCount; ++li_Isotope)
 				{
@@ -524,7 +654,7 @@ void k_Quantifier::handleScan(r_Scan& ar_Scan)
 					lk_ForbiddenMz << mk_AllTargetMasses[li_TargetMzIndex];
 				if (lk_ExcludePeakForTargetMz.contains(li_TargetMzIndex))
 					lk_HeavyPeaksExclude[-1 - k] = lk_AllPeaks[lk_ExcludePeakForTargetMz[li_TargetMzIndex]];
-			}
+			}*/
 			QString ls_Key = QString("%1-%2-forbidden").arg(ls_Peptide).arg(li_Charge);
 			int li_TargetMzIndex = mk_TargetMzIndex[ls_Key];
 			if (mb_CheckLightForbiddenPeaks)
@@ -543,6 +673,7 @@ void k_Quantifier::handleScan(r_Scan& ar_Scan)
 			{
 				lr_ScanResult.ms_ScanHashKey = QString("%1.%2.%3.%4").arg(ms_CurrentSpot).arg(ar_Scan.ms_Id).arg(ls_Peptide).arg(li_Charge);
 				lr_ScanResult.md_RetentionTime = ar_Scan.md_RetentionTime;
+                lr_ScanResult.ms_Peptide = ls_Peptide;
 				lr_ScanResult.mi_Charge = li_Charge;
 				lr_ScanResult.ms_ScanId = ar_Scan.ms_Id;
 				/*
@@ -663,18 +794,25 @@ QString k_Quantifier::renderScanAsSvg(r_Scan& ar_Scan, r_ScanQuantitationResult 
 		ymax = std::max<double>(ymax, ar_Scan.mr_Spectrum.md_IntensityValues_[i]);
 	// ymax remains unscaled!
 	double ymaxScaled = this->scale(1.0);
+    
+    double ymaxUnlabeled = 0.0;
+    foreach (r_Peak lr_Peak, ar_QuantitationResult.mk_UnlabeledPeaks)
+        ymaxUnlabeled = std::max<double>(ymaxUnlabeled, lr_Peak.md_PeakIntensity / ymax);
 	
 	QBuffer lk_Buffer;
 	lk_Buffer.open(QBuffer::WriteOnly);
-	
-	double ld_OnePercent = 0.0;
-	double ld_TenPercent = 0.0;
-	double ld_OneHundredPercent = 0.0;
-	
+
+    QList<double> lk_Lines;
+    if (mb_LogScale)
+        lk_Lines << 0.01 << 0.1 << 1.0;
+    else
+        lk_Lines << 0.2 << 0.4 << 0.6 << 0.8 << 1.0;
+            
 	double x0 = ld_BorderLeft;
 	double y0 = ld_Height - ld_BorderBottom;
 	double dx = (ld_Width - ld_BorderLeft - ld_BorderRight) / (xmax - xmin);
 	double dy = -(ld_Height - ld_BorderTop - ld_BorderBottom);
+    QString ls_Labels;
 	
 	{
 		QSvgGenerator lk_Generator;
@@ -696,6 +834,17 @@ QString k_Quantifier::renderScanAsSvg(r_Scan& ar_Scan, r_ScanQuantitationResult 
 		lk_Painter.drawLine(QPointF(0.0, y0), QPointF(ld_Width, y0));
 		//lk_Painter.drawLine(QPointF(0.0, y0), QPointF(ld_Width, y0));
 		//lk_Painter.drawLine(QPointF(x0, y0), QPointF(x0, y0 + (ymax - ymin) * dy));
+        
+        QString ls_Peptide = ar_QuantitationResult.ms_Peptide;
+/*        for (int i = 0; i < mk_IsotopeEnvelopesLight[ls_Peptide].size(); ++i)
+        {
+            double ld_Abundance = mk_IsotopeEnvelopesLight[ls_Peptide][i] * ymaxUnlabeled;
+            double ld_Mz = ar_QuantitationResult.mk_TargetMz.first() + i * NEUTRON / ar_QuantitationResult.mi_Charge;
+            double x = (ld_Mz - xmin) * dx + x0;
+            double y = this->scale(ld_Abundance) / ymaxScaled;
+            y = y * dy + y0;
+            lk_Painter.drawLine(QPointF(x - 5.0, y), QPointF(x + 5.0, y));
+        }*/
 		
 		// draw spectrum
 		lk_Pen.setWidthF(1.0);
@@ -723,16 +872,14 @@ QString k_Quantifier::renderScanAsSvg(r_Scan& ar_Scan, r_ScanQuantitationResult 
 		lk_Pen.setColor(QColor(192, 192, 192));
 		lk_Painter.setPen(lk_Pen);
 		
-		double y;
-		y = this->scale(1.0 / 100.0) / ymaxScaled;
-		ld_OnePercent = y * dy + y0;
-		lk_Painter.drawLine(QPointF(0.0, y * dy + y0), QPointF(ld_Width, y * dy + y0));
-		y = this->scale(10.0 / 100.0) / ymaxScaled;
-		ld_TenPercent = y * dy + y0;
-		lk_Painter.drawLine(QPointF(0.0, y * dy + y0), QPointF(ld_Width, y * dy + y0));
-		y = this->scale(100.0 / 100.0) / ymaxScaled;
-		ld_OneHundredPercent = y * dy + y0;
-		lk_Painter.drawLine(QPointF(0.0, y * dy + y0), QPointF(ld_Width, y * dy + y0));
+        foreach (double ld_Line, lk_Lines)
+        {
+            double y;
+            y = this->scale(ld_Line) / ymaxScaled;
+            y = y * dy + y0;
+            lk_Painter.drawLine(QPointF(0.0, y), QPointF(ld_Width, y));
+            ls_Labels += QString("<text x='%1' y='%2' style='font-size:10px; font-family:Verdana;' transform='rotate(90 %1 %2)'>%3%</text>\n").arg(0.0).arg(y + 3.0).arg((int)round(ld_Line * 100.0));
+        }
 		
 		lk_Pen.setWidthF(1.0);
 		lk_Pen.setJoinStyle(Qt::RoundJoin);
@@ -768,17 +915,16 @@ QString k_Quantifier::renderScanAsSvg(r_Scan& ar_Scan, r_ScanQuantitationResult 
 	lk_Buffer.seek(0);
 	QString ls_Result = QString(lk_Buffer.readAll());
 	lk_Buffer.close();
-	QString ls_Labels;
-	ls_Labels += QString("<text x='%1' y='%2' style='font-size:10px; font-family:Verdana;' transform='rotate(90 %1 %2)'>1%</text>\n").arg(0.0).arg(ld_OnePercent + 3.0);
-	ls_Labels += QString("<text x='%1' y='%2' style='font-size:10px; font-family:Verdana;' transform='rotate(90 %1 %2)'>10%</text>\n").arg(0.0).arg(ld_TenPercent + 3.0);
-	ls_Labels += QString("<text x='%1' y='%2' style='font-size:10px; font-family:Verdana;' transform='rotate(90 %1 %2)'>100%</text>\n").arg(0.0).arg(ld_OneHundredPercent + 3.0);
 	foreach (r_Peak lr_Peak, (ar_QuantitationResult.mk_UnlabeledPeaks + ar_QuantitationResult.mk_LabeledPeaks))
 	{
 		double ld_X, ld_Y;
 		ld_X = (lr_Peak.md_PeakMz - xmin) * dx + x0;
 		ld_Y = this->scale(lr_Peak.md_PeakIntensity / ymax) / ymaxScaled * dy + y0;
 		char lc_Number_[1024];
-		sprintf(lc_Number_, "%.2g", lr_Peak.md_PeakIntensity);
+        if (mb_UseArea)
+            sprintf(lc_Number_, "%.2g", lr_Peak.md_PeakArea);
+        else
+            sprintf(lc_Number_, "%.2g", lr_Peak.md_PeakIntensity);
 		ls_Labels += QString("<text x='%1' y='%2' style='font-size:10px; font-family:Verdana; fill: #aaa;' transform='rotate(90 %1 %2)'>%3</text>\n").arg(ld_X + 3.0).arg(ld_Y + 3.0).arg(lc_Number_);
 	}
 	ls_Result.replace("</svg>", ls_Labels + "</svg>");
@@ -788,7 +934,10 @@ QString k_Quantifier::renderScanAsSvg(r_Scan& ar_Scan, r_ScanQuantitationResult 
 
 double k_Quantifier::scale(const double ad_Value) const
 {
-	return log(ad_Value * 100.0 + 1.0);
+    if (mb_LogScale)
+        return log(ad_Value * 100.0 + 1.0);
+    else
+        return ad_Value;
 }
 
 
@@ -824,8 +973,6 @@ k_Quantifier::checkResult(QHash<int, r_Peak> ak_LightPeaksInclude,
 	r_ScanQuantitationResult lr_Result;
 	lr_Result.mb_IsGood = false;
 	
-	updateFailureReason(ar_Scan.ms_Id, r_QuantitationFailureReason::LowSnr);
-
 	// check whether all inclusion peaks have a good SNR
 	QList<r_Peak> lk_Peaks = ak_LightPeaksInclude.values() + ak_HeavyPeaksInclude.values();
 	
@@ -840,8 +987,6 @@ k_Quantifier::checkResult(QHash<int, r_Peak> ak_LightPeaksInclude,
 	if (ld_MinSnr < md_MinSnr)
 		return lr_Result;
 	
-	updateFailureReason(ar_Scan.ms_Id, r_QuantitationFailureReason::Success);
-		
 	lr_Result.md_Snr = ld_MinSnr;
 	
 	double ld_LightSum = 0.0;
@@ -852,28 +997,34 @@ k_Quantifier::checkResult(QHash<int, r_Peak> ak_LightPeaksInclude,
 	int li_LightPeakExcludeCount = 0;
 	int li_HeavyPeakExcludeCount = 0;
 	
-	for (int li_Isotope = 0; li_Isotope < mi_WatchIsotopesCount; ++li_Isotope)
+/*	for (int li_Isotope = 0; li_Isotope < mi_WatchIsotopesCount; ++li_Isotope)
 	{
 		if (ak_LightPeaksInclude.contains(li_Isotope))
 		{
-			ld_LightSum += ak_LightPeaksInclude[li_Isotope].md_PeakArea;
+            if (mb_UseArea)
+                ld_LightSum += ak_LightPeaksInclude[li_Isotope].md_PeakArea;
+            else
+                ld_LightSum += ak_LightPeaksInclude[li_Isotope].md_PeakIntensity;
 			++li_LightPeakIncludeCount;
 		}
 		if (ak_LightPeaksExclude.contains(li_Isotope))
-			++li_LightPeakExcludeCount;
-		for (int k = 0; k < mk_LabeledEnvelopeCountForPeptide[as_Peptide]; ++k)
+			++li_LightPeakExcludeCount;*/
+/*		for (int k = 0; k < mk_LabeledEnvelopeCountForPeptide[as_Peptide]; ++k)
 		{
 			if (ak_HeavyPeaksInclude.contains(k * mi_WatchIsotopesCount + li_Isotope))
 			{
-				ld_HeavySum += ak_HeavyPeaksInclude[k * mi_WatchIsotopesCount + li_Isotope].md_PeakArea;
+                if (mb_UseArea)
+                    ld_HeavySum += ak_HeavyPeaksInclude[k * mi_WatchIsotopesCount + li_Isotope].md_PeakArea;
+                else
+                    ld_HeavySum += ak_HeavyPeaksInclude[k * mi_WatchIsotopesCount + li_Isotope].md_PeakIntensity;
 				++li_HeavyPeakIncludeCount;
 			}
 			if (ak_HeavyPeaksExclude.contains(k * mi_WatchIsotopesCount + li_Isotope))
 				++li_HeavyPeakExcludeCount;
-		}
-	}
+		}*/
+// 	}
 	
-	if (li_LightPeakIncludeCount == mi_WatchIsotopesCount && 
+/*	if (li_LightPeakIncludeCount == mi_WatchIsotopesCount && 
 		li_HeavyPeakIncludeCount == mi_WatchIsotopesCount * mk_LabeledEnvelopeCountForPeptide[as_Peptide])
 	{
 		// both isotope envelopes are complete, we get a ratio!
@@ -889,7 +1040,6 @@ k_Quantifier::checkResult(QHash<int, r_Peak> ak_LightPeaksInclude,
 		}
 		lr_Result.md_AmountUnlabeled = ld_LightSum;
 		lr_Result.md_AmountLabeled = ld_HeavySum;
-		lr_Result.md_Ratio = ld_LightSum / ld_HeavySum;
 	}
 	else if (li_LightPeakIncludeCount == mi_WatchIsotopesCount && 
 			 li_HeavyPeakExcludeCount == 0)
@@ -899,7 +1049,6 @@ k_Quantifier::checkResult(QHash<int, r_Peak> ak_LightPeaksInclude,
 			return lr_Result;
 		lr_Result.md_AmountUnlabeled = ld_LightSum;
 		lr_Result.md_AmountLabeled = 0.0;
-		lr_Result.md_Ratio = std::numeric_limits<double>::infinity(); 
 	}
 	else if (li_LightPeakExcludeCount == 0 && 
 			 li_HeavyPeakIncludeCount == mi_WatchIsotopesCount * mk_LabeledEnvelopeCountForPeptide[as_Peptide])
@@ -910,13 +1059,12 @@ k_Quantifier::checkResult(QHash<int, r_Peak> ak_LightPeaksInclude,
 				return lr_Result;
 		lr_Result.md_AmountUnlabeled = 0.0;
 		lr_Result.md_AmountLabeled = ld_HeavySum;
-		lr_Result.md_Ratio = 0.0;
 	}
 	else
 	{
 		// no complete isotope envelope
 		return lr_Result;
-	}
+	}*/
 	
 	lr_Result.mk_TargetMz = ak_TargetMz;
 	lr_Result.mk_ForbiddenMz = ak_ForbiddenMz;
@@ -965,9 +1113,21 @@ double k_Quantifier::gaussian(double x, double a, double b, double c)
 }
 
 
-void k_Quantifier::updateFailureReason(const QString& as_Key, r_QuantitationFailureReason::Enumeration ae_Value)
+QHash<QString, int> k_Quantifier::compositionForPeptide(const QString& as_Peptide)
 {
-	if (!mk_ScanFailureReason.contains(as_Key))
-		mk_ScanFailureReason[as_Key] = ae_Value;
-	mk_ScanFailureReason[as_Key] = (r_QuantitationFailureReason::Enumeration)(std::max<int>((int)mk_ScanFailureReason[as_Key], (int)ae_Value));
+    QHash<QString, int> lk_Composition;
+    lk_Composition["H"] = 2;
+    lk_Composition["O"] = 1;
+    for (int i = 0; i < as_Peptide.size(); ++i)
+    {
+        char lc_AminoAcid = as_Peptide.at(i).toAscii();
+        QHash<QString, int> lk_AminoAcidComposition = mk_AminoAcidComposition[lc_AminoAcid];
+        foreach (QString ls_Element, lk_AminoAcidComposition.keys())
+        {
+            if (!lk_Composition.contains(ls_Element))
+                lk_Composition[ls_Element] = 0;
+            lk_Composition[ls_Element] += lk_AminoAcidComposition[ls_Element];
+        }
+    }
+    return lk_Composition;
 }
