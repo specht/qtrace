@@ -43,12 +43,25 @@ struct r_LabelType
 };
 
 
+struct r_AmountEstimation
+{
+    enum Enumeration {
+        Profile = 0,
+        Intensity = 1,
+        Area = 2,
+        Size
+    };
+};
+
+
 struct r_ScanQuantitationResult
 {
 	bool mb_IsGood;
     QString ms_Peptide;
 	double md_AmountUnlabeled;
 	double md_AmountLabeled;
+    double md_UnlabeledProfileScale;
+    double md_LabeledProfileScale;
 	double md_Snr;
 	double md_RetentionTime;
 	QList<double> mk_TargetMz;
@@ -59,6 +72,8 @@ struct r_ScanQuantitationResult
 	QString ms_ScanId;
 	QList<r_Peak> mk_UnlabeledPeaks;
 	QList<r_Peak> mk_LabeledPeaks;
+    double md_UnlabeledError;
+    double md_LabeledError;
 	
 	// scan data
 	QString ms_ScanHashKey;
@@ -82,13 +97,15 @@ struct r_Bucket
 // peptide => scan results
 typedef QHash<QString, QList<r_ScanQuantitationResult> > tk_SpotResults;
 
+typedef QPair<double, double> tk_DoublePair;
+
 
 class k_Quantifier: public k_ScanIterator
 {
 public:
 	k_Quantifier(r_LabelType::Enumeration ae_LabelType = r_LabelType::HeavyArginineAndProline,
 				 r_ScanType::Enumeration ae_ScanType = r_ScanType::All,
-                 bool ab_UseArea = true,
+                 r_AmountEstimation::Enumeration ab_UseArea = r_AmountEstimation::Profile,
 				 QList<tk_IntPair> ak_MsLevels = QList<tk_IntPair>() << tk_IntPair(0, 0x10000),
 				 int ai_IsotopeCount = 3, int ai_MinCharge = 2, int ai_MaxCharge = 3, 
 				 double ad_MinSnr = 2.0, double ad_MassAccuracy = 5.0,
@@ -124,6 +141,7 @@ protected:
 					 double x1, double y1, double x2, double y2);
 	double gaussian(double x, double a, double b, double c);
     QHash<QString, int> compositionForPeptide(const QString& as_Peptide);
+    double leastSquaresFit(QList<tk_DoublePair> ak_Pairs);
 
 /*
 	peptide:
@@ -135,7 +153,7 @@ protected:
 	QTextStream mk_CsvOutStream;
 	QTextStream mk_XhtmlOutStream;
 	r_LabelType::Enumeration me_LabelType;
-    bool mb_UseArea;
+    r_AmountEstimation::Enumeration me_AmountEstimation;
 	int mi_MinCharge;
 	int mi_MaxCharge;
 	double md_MinSnr;
@@ -159,6 +177,9 @@ protected:
     QHash<QString, QSet<QString> > mk_LabeledRequiredTargetMzForPeptideCharge;
     QHash<QString, QStringList> mk_LabeledConsideredLeftTargetMzForPeptideCharge;
     QHash<QString, QStringList> mk_LabeledConsideredRightTargetMzForPeptideCharge;
+    
+    QHash<QString, tk_IsotopeEnvelope> mk_UnlabeledIsotopeEnvelopeForPeptideCharge;
+    QHash<QString, tk_IsotopeEnvelope> mk_LabeledIsotopeEnvelopeForPeptideCharge;
 	
 	// peptide-charge-label-isotope
 	QHash<QString, int> mk_TargetMzIndex;

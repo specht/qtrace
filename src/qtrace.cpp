@@ -35,7 +35,7 @@ void printUsageAndExit()
 	printf("      RP : SILAC labeling with 13C6-arginine, additional care is taken for accidentally labeled proline residues.\n");
 	printf("      N15: N15 labeling, where every amino acid is affected.\n");
 	printf("  --scanType [full|sim|all] (default: all)\n");
-    printf("  --use [intensity|area] (default: area)\n");
+    printf("  --use [profile|intensity|area] (default: profile)\n");
 	printf("  --isotopeCount [int] (default: 3)\n");
 	printf("  --minCharge [int] (default: 2)\n");
 	printf("  --maxCharge [int] (default: 3)\n");
@@ -97,7 +97,7 @@ int main(int ai_ArgumentCount, char** ac_Arguments__)
 
 	r_LabelType::Enumeration le_LabelType = r_LabelType::HeavyArginineAndProline;
 	r_ScanType::Enumeration le_ScanType = r_ScanType::All;
-    bool lb_UseArea = true;
+    r_AmountEstimation::Enumeration le_AmountEstimation = r_AmountEstimation::Profile;
 	int li_IsotopeCount = 3;
 	int li_MinCharge = 2;
 	int li_MaxCharge = 3;
@@ -170,9 +170,11 @@ int main(int ai_ArgumentCount, char** ac_Arguments__)
         lk_Arguments.removeAt(li_Index);
         lk_Arguments.removeAt(li_Index);
         if (ls_Use == "intensity")
-            lb_UseArea = false;
+            le_AmountEstimation = r_AmountEstimation::Intensity;
         else if (ls_Use == "area")
-            lb_UseArea = true;
+            le_AmountEstimation = r_AmountEstimation::Area;
+        else if (ls_Use == "profile")
+            le_AmountEstimation = r_AmountEstimation::Profile;
         else
         {
             printf("Error: unknown 'use' parameter %s.\n", ls_Use.toStdString().c_str());
@@ -316,7 +318,7 @@ int main(int ai_ArgumentCount, char** ac_Arguments__)
 	//RefPtr<QIODevice> lk_pTextDevice(new QIODevice(stdout));
 	
 	k_Quantifier 
-        lk_Quantifier(le_LabelType, le_ScanType, lb_UseArea,
+        lk_Quantifier(le_LabelType, le_ScanType, le_AmountEstimation,
                       QList<tk_IntPair>() << tk_IntPair(1, 1),
                       li_IsotopeCount, li_MinCharge, li_MaxCharge, ld_MinSnr, 
                       ld_MassAccuracy, ld_ExcludeMassAccruracy, lk_CsvDevice_, 
