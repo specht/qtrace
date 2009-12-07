@@ -515,8 +515,8 @@ void k_Quantifier::handleScan(r_Scan& ar_Scan)
             if (lb_FoundLightEnvelope || lb_FoundHeavyEnvelope)
             {
                 // oy, we found all required peaks of at least one state!
-                printf("%s %d+ %d %d\n", ls_Peptide.toStdString().c_str(),
-                       li_Charge, lb_FoundLightEnvelope, lb_FoundHeavyEnvelope);
+/*                printf("%s %d+ %d %d\n", ls_Peptide.toStdString().c_str(),
+                       li_Charge, lb_FoundLightEnvelope, lb_FoundHeavyEnvelope);*/
                 
                 QSet<QString> lk_UnlabeledKeys;
                 QSet<QString> lk_LabeledKeys;
@@ -574,7 +574,6 @@ void k_Quantifier::handleScan(r_Scan& ar_Scan)
                 lr_ScanResult.md_UnlabeledError = 0.0;
                 lr_ScanResult.md_LabeledError = 0.0;
                 
-                
                 if (!lk_UnlabeledKeys.empty())
                 {
                     QList<tk_DoublePair> lk_MatchValues;
@@ -603,7 +602,6 @@ void k_Quantifier::handleScan(r_Scan& ar_Scan)
                         ld_Error += pow(ld_PeakHeight - ld_EnvelopeHeight, 2.0);
                     }
                     lr_ScanResult.md_UnlabeledError = ld_Error;
-                    printf("light error: %1.8f\n", ld_Error);
                     if (me_AmountEstimation == r_AmountEstimation::Profile)
                         lr_ScanResult.md_AmountUnlabeled = ld_Factor;
                 }
@@ -636,9 +634,22 @@ void k_Quantifier::handleScan(r_Scan& ar_Scan)
                         ld_Error += pow(ld_PeakHeight - ld_EnvelopeHeight, 2.0);
                     }
                     lr_ScanResult.md_LabeledError = ld_Error;
-                    printf("heavy error: %1.8f\n", ld_Error);
                     if (me_AmountEstimation == r_AmountEstimation::Profile)
                         lr_ScanResult.md_AmountLabeled = ld_Factor;
+                }
+                
+                if (mk_CsvOutStream.device())
+                {
+                    mk_CsvOutStream << "\"" << ms_CurrentSpot << "\""
+                        << ",\"" << ar_Scan.ms_Id << "\""
+                        << ",\"" << ls_Peptide << "\""
+                        << "," << lr_ScanResult.md_AmountUnlabeled
+                        << "," << lr_ScanResult.md_AmountLabeled
+                        << "," << ar_Scan.md_RetentionTime
+                        << "," << lr_ScanResult.mi_Charge
+                        << ",\"" << ar_Scan.ms_FilterLine << "\""
+                        << "," << lr_ScanResult.md_Snr
+                        << endl;
                 }
                 
                 if (mk_XhtmlOutStream.device())
@@ -936,7 +947,7 @@ QString k_Quantifier::renderScanAsSvg(r_Scan& ar_Scan, r_ScanQuantitationResult 
         lk_Pen.setJoinStyle(Qt::BevelJoin);
         lk_Pen.setColor(QColor(128, 128, 128));
         lk_Painter.setPen(lk_Pen);
-        lk_Painter.setBrush(QBrush(QColor(192, 192, 192, 128)));
+        lk_Painter.setBrush(QBrush(QColor(224, 224, 224, 128)));
         
         lk_Painter.drawPath(lk_Path);
 		
@@ -973,7 +984,7 @@ QString k_Quantifier::renderScanAsSvg(r_Scan& ar_Scan, r_ScanQuantitationResult 
         lk_Pen.setJoinStyle(Qt::BevelJoin);
         lk_Pen.setColor(QColor(128, 128, 128));
         lk_Painter.setPen(lk_Pen);
-        lk_Painter.setBrush(QBrush(QColor(192, 192, 192, 128)));
+        lk_Painter.setBrush(QBrush(QColor(224, 224, 224, 128)));
         
         lk_Painter.drawPath(lk_Path);
         
