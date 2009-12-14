@@ -27,8 +27,7 @@ along with SimQuant.  If not, see <http://www.gnu.org/licenses/>.
 //#define NEUTRON 1.008664915
 // TODO: verify this neutron mass
 #define NEUTRON 1.002
-#define HEAVY_ARGININE 6.020129027
-#define HEAVY_PROLINE 5.016774189
+#define HEAVY_CARBON 1.0033548378
 #define HEAVY_NITROGEN 0.997034893
 
 struct r_LabelType
@@ -37,6 +36,7 @@ struct r_LabelType
 		HeavyArginine = 0,
 		HeavyArginineAndProline = 1,
 		N15Labeling = 2,
+        HeavyKRPNitrogenAndCarbon = 3,
 		Size
 	};
 };

@@ -31,9 +31,10 @@ void printUsageAndExit()
 	printf("Spectra files may be mzData, mzXML or mzML, optionally compressed (.gz|.bz2|.zip).\n");
 	printf("Options:\n");
 	printf("  --label [R|RP|N15] (default: RP)\n");
-	printf("      R  : SILAC labeling with 13C6-arginine.\n");
-	printf("      RP : SILAC labeling with 13C6-arginine, additional care is taken for accidentally labeled proline residues.\n");
-	printf("      N15: N15 labeling, where every amino acid is affected.\n");
+	printf("      R    : SILAC labeling with 13C6-arginine.\n");
+	printf("      RP   : SILAC labeling with 13C6-arginine, additional care is taken for accidentally labeled proline residues.\n");
+    printf("      RPKCN: SILAC labeling with 13C6,15N4-arginine and 13C6,15N2-lysine.\n");
+	printf("      N15  : N15 labeling, where every amino acid is affected.\n");
 	printf("  --scanType [full|sim|all] (default: all)\n");
 	printf("  --isotopeCount [int] (default: 3)\n");
 	printf("  --minCharge [int] (default: 2)\n");
@@ -131,6 +132,8 @@ int main(int ai_ArgumentCount, char** ac_Arguments__)
 			le_LabelType = r_LabelType::HeavyArginineAndProline;
 		else if (ls_Label == "N15")
 			le_LabelType = r_LabelType::N15Labeling;
+        else if (ls_Label == "RPKCN")
+            le_LabelType = r_LabelType::HeavyKRPNitrogenAndCarbon;
 		else
 		{
 			printf("Error: unknown label %s.\n", ls_Label.toStdString().c_str());
