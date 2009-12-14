@@ -249,7 +249,10 @@ void k_Quantifier::quantify(QStringList ak_SpectraFiles, QStringList ak_Peptides
 				// save labeled mass
 				for (int k = 0; k < mk_LabeledEnvelopeCountForPeptide[ls_Peptide]; ++k)
 				{
-					ld_Mz = ld_PeptideMz + i * NEUTRON / li_Charge + (ld_ModMz + HEAVY_CARBON * 5.0 * k) / li_Charge;
+                    if (me_LabelType == r_LabelType::HeavyKRPNitrogenAndCarbon)
+                        ld_Mz = ld_PeptideMz + i * NEUTRON / li_Charge + (ld_ModMz + HEAVY_CARBON * 5.0 * k + HEAVY_NITROGEN * 1.0 * k) / li_Charge;
+                    else
+                        ld_Mz = ld_PeptideMz + i * NEUTRON / li_Charge + (ld_ModMz + HEAVY_CARBON * 5.0 * k) / li_Charge;
 // 					printf("%s* (%d+): %1.6f\n", ls_Peptide.toStdString().c_str(), li_Charge, ld_Mz);
 					ls_Key = QString("%1-%2-labeled-%3-%4").arg(ls_Peptide).arg(li_Charge).arg(k).arg(i);
 					lk_TempList.push_back(tk_DoubleStringPair(ld_Mz, ls_Key));
@@ -262,7 +265,10 @@ void k_Quantifier::quantify(QStringList ak_SpectraFiles, QStringList ak_Peptides
 			// save labeled forbidden peak (one to the left from the labeled A+0 peak)
 			for (int k = 0; k < mk_LabeledEnvelopeCountForPeptide[ls_Peptide]; ++k)
 			{
-				ld_Mz = ld_PeptideMz - NEUTRON / li_Charge + (ld_ModMz + k * HEAVY_CARBON * 5.0) / li_Charge;
+                if (me_LabelType == r_LabelType::HeavyKRPNitrogenAndCarbon)
+                    ld_Mz = ld_PeptideMz - NEUTRON / li_Charge + (ld_ModMz + k * HEAVY_CARBON * 5.0 + HEAVY_NITROGEN * 1.0 * k) / li_Charge;
+                else
+                    ld_Mz = ld_PeptideMz - NEUTRON / li_Charge + (ld_ModMz + k * HEAVY_CARBON * 5.0) / li_Charge;
 				ls_Key = QString("%1-%2-forbidden-labeled-%3").arg(ls_Peptide).arg(li_Charge).arg(k);
 				lk_TempList.push_back(tk_DoubleStringPair(ld_Mz, ls_Key));
 			}
