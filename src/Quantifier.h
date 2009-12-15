@@ -23,24 +23,27 @@ along with qTrace.  If not, see <http://www.gnu.org/licenses/>.
 #include "IsotopeEnvelope.h"
 
 
-#define HYDROGEN 1.007947
-#define WATER 18.01057
-//#define NEUTRON 1.008664915
-// TODO: verify this neutron mass
-#define NEUTRON 1.002
-#define HEAVY_ARGININE 6.020129027
-#define HEAVY_PROLINE 5.016774189
-#define HEAVY_NITROGEN 0.997034893
-
-struct r_LabelType
+struct r_IsotopeAbundance
 {
-	enum Enumeration {
-		HeavyArginine = 0,
-		HeavyArginineAndProline = 1,
-		N15Labeling = 2,
-		Size
-	};
+    r_IsotopeAbundance()
+        : mi_Isotope(0)
+        , mf_Efficiency(1.0)
+    {
+    }
+    
+    r_IsotopeAbundance(int ai_Isotope, float af_Efficiency)
+        : mi_Isotope(ai_Isotope)
+        , mf_Efficiency(af_Efficiency)
+    {
+    }
+    
+    int mi_Isotope;
+    float mf_Efficiency;
 };
+
+// tk_ArtificialEnvironment defines an artificial environment in
+// which the abundances of the isotopes are modified (like 99% 15N)
+typedef QHash<QString, r_IsotopeAbundance> tk_ArtificialEnvironment;
 
 
 struct r_AmountEstimation
@@ -103,7 +106,7 @@ typedef QPair<double, double> tk_DoublePair;
 class k_Quantifier: public k_ScanIterator
 {
 public:
-	k_Quantifier(r_LabelType::Enumeration ae_LabelType = r_LabelType::HeavyArginineAndProline,
+	k_Quantifier(QString as_Label = "15N",
 				 r_ScanType::Enumeration ae_ScanType = r_ScanType::All,
                  r_AmountEstimation::Enumeration ab_UseArea = r_AmountEstimation::Profile,
 				 QList<tk_IntPair> ak_MsLevels = QList<tk_IntPair>() << tk_IntPair(0, 0x10000),
@@ -142,6 +145,11 @@ protected:
 	double gaussian(double x, double a, double b, double c);
     QHash<QString, int> compositionForPeptide(const QString& as_Peptide);
     double leastSquaresFit(QList<tk_DoublePair> ak_Pairs);
+    void parseLabel();
+    QStringList tokenize(QString as_String);
+    QString fetchNextToken(QStringList* ak_StringList_, QVariant::Type* ae_Type_);
+    QVariant::Type peekNextToken(QStringList ak_StringList);
+    tk_IsotopeEnvelope heavyEnvelopeForPeptide(QString as_Peptide);
 
 /*
 	peptide:
@@ -152,7 +160,7 @@ protected:
 */
 	QTextStream mk_CsvOutStream;
 	QTextStream mk_XhtmlOutStream;
-	r_LabelType::Enumeration me_LabelType;
+	QString ms_Label;
     r_AmountEstimation::Enumeration me_AmountEstimation;
 	int mi_MinCharge;
 	int mi_MaxCharge;
@@ -189,4 +197,9 @@ protected:
     //QHash<QString, QList<double> > mk_IsotopeEnvelopesLight;
 	
 	//QHash<QString, QList<QList<double> > > mk_ElutionProfile;
+    double md_WaterMass;
+    double md_HydrogenMass;
+    
+    QHash<QString, k_IsotopeEnvelope> mk_HeavyIsotopeEnvelopeForAminoAcid;
+    QHash<QString, tk_ArtificialEnvironment> mk_Label;
 };

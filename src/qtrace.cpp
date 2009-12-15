@@ -30,10 +30,19 @@ void printUsageAndExit()
 	printf("Usage: qtrace [options] --spectraFiles [spectra files] --peptides [peptides] --peptideFiles [peptide files]\n");
 	printf("Spectra files may be mzData, mzXML or mzML, optionally compressed (.gz|.bz2|.zip).\n");
 	printf("Options:\n");
-	printf("  --label [R|RP|N15] (default: RP)\n");
-	printf("      R  : SILAC labeling with 13C6-arginine.\n");
-	printf("      RP : SILAC labeling with 13C6-arginine, additional care is taken for accidentally labeled proline residues.\n");
-	printf("      N15: N15 labeling, where every amino acid is affected.\n");
+	printf("  --label <string> (default: 15N)\n");
+    printf("      Specify the label here. Examples:\n");
+    printf("      15N: 15N in all amino acids\n");
+    printf("      R 13C: 13C in all arginine residues\n");
+    printf("      RP 13C: 13C in all arginine and proline residues\n");
+    printf("      RPK 13C 15N: 13C and 15N in all arginine, proline and lysine residues\n");
+    printf("      R 13C K 15N: 13C in arginine, 15N in lysine residues\n");
+    printf("      15N (0.99): 99%% 15N in all amino acids (1%% is N14)\n");
+    printf("      The exact syntax is:\n");
+    printf("        ((amino acid)* (isotope)+ (efficiency)? )+\n");
+    printf("      Notes:\n");
+    printf("        Efficiency can only be specified for C and N.\n");
+    printf("        X denotes any amino acid: 'X 15N' is the same as '15N'.\n");
 	printf("  --scanType [full|sim|all] (default: all)\n");
     printf("  --use [profile|intensity|area] (default: profile)\n");
 	printf("  --isotopeCount [int] (default: 3)\n");
@@ -95,7 +104,7 @@ int main(int ai_ArgumentCount, char** ac_Arguments__)
 		exit(0);
 	}
 
-	r_LabelType::Enumeration le_LabelType = r_LabelType::HeavyArginineAndProline;
+	QString ls_Label = "15N";
 	r_ScanType::Enumeration le_ScanType = r_ScanType::All;
     r_AmountEstimation::Enumeration le_AmountEstimation = r_AmountEstimation::Profile;
 	int li_IsotopeCount = 3;
@@ -125,20 +134,9 @@ int main(int ai_ArgumentCount, char** ac_Arguments__)
 	li_Index = lk_Arguments.indexOf("--label");
 	if (li_Index > -1)
 	{
-		QString ls_Label = lk_Arguments[li_Index + 1].toUpper();
+		ls_Label = lk_Arguments[li_Index + 1];
 		lk_Arguments.removeAt(li_Index);
 		lk_Arguments.removeAt(li_Index);
-		if (ls_Label == "R")
-			le_LabelType = r_LabelType::HeavyArginine;
-		else if (ls_Label == "RP")
-			le_LabelType = r_LabelType::HeavyArginineAndProline;
-		else if (ls_Label == "N15")
-			le_LabelType = r_LabelType::N15Labeling;
-		else
-		{
-			printf("Error: unknown label %s.\n", ls_Label.toStdString().c_str());
-			exit(1);
-		}
 	}
 	
 	li_Index = lk_Arguments.indexOf("--scanType");
@@ -318,7 +316,7 @@ int main(int ai_ArgumentCount, char** ac_Arguments__)
 	//RefPtr<QIODevice> lk_pTextDevice(new QIODevice(stdout));
 	
 	k_Quantifier 
-        lk_Quantifier(le_LabelType, le_ScanType, le_AmountEstimation,
+        lk_Quantifier(ls_Label, le_ScanType, le_AmountEstimation,
                       QList<tk_IntPair>() << tk_IntPair(1, 1),
                       li_IsotopeCount, li_MinCharge, li_MaxCharge, ld_MinSnr, 
                       ld_MassAccuracy, ld_ExcludeMassAccruracy, lk_CsvDevice_, 
