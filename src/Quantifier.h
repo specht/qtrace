@@ -110,12 +110,13 @@ public:
 				 r_ScanType::Enumeration ae_ScanType = r_ScanType::All,
                  r_AmountEstimation::Enumeration ab_UseArea = r_AmountEstimation::Profile,
 				 QList<tk_IntPair> ak_MsLevels = QList<tk_IntPair>() << tk_IntPair(0, 0x10000),
-				 int ai_IsotopeCount = 3, int ai_MinCharge = 2, int ai_MaxCharge = 3, 
+				 int ai_MinCharge = 2, int ai_MaxCharge = 3, 
 				 double ad_MinSnr = 2.0, double ad_MassAccuracy = 5.0,
-				 double ad_ExcludeMassAccuracy = 10.0,
+                 double ad_RequireAbundance = 0.5,
+                 double ad_ConsiderAbundance = 0.05,
+                 double ad_MaxFitError = 0.01,
 				 QIODevice* ak_CsvOutDevice_ = NULL, QIODevice* ak_XhtmlOutDevice_ = NULL,
-				 bool ab_CheckLightForbiddenPeaks = true,
-				 bool ab_CheckHeavyForbiddenPeaks = false,
+				 bool ab_CheckForbiddenPeak = true,
 				 bool ab_PrintStatusMessages = true,
                  bool ab_LogScale = true);
 	virtual ~k_Quantifier();
@@ -151,13 +152,6 @@ protected:
     QVariant::Type peekNextToken(QStringList ak_StringList);
     tk_IsotopeEnvelope heavyEnvelopeForPeptide(QString as_Peptide);
 
-/*
-	peptide:
-		spectra file/charge:
-			ratio:
-			certainty:
-			more info:
-*/
 	QTextStream mk_CsvOutStream;
 	QTextStream mk_XhtmlOutStream;
 	QString ms_Label;
@@ -166,10 +160,10 @@ protected:
 	int mi_MaxCharge;
 	double md_MinSnr;
 	double md_MassAccuracy;
-	double md_ExcludeMassAccuracy;
-	double md_ElutionProfilePeakWidth;
-	bool mb_CheckLightForbiddenPeaks;
-	bool mb_CheckHeavyForbiddenPeaks;
+	bool mb_CheckForbiddenPeak;
+    double md_RequireAbundance;
+    double md_ConsiderAbundance;
+    double md_MaxFitError;
 	bool mb_PrintStatusMessages;
     bool mb_LogScale;
 	QList<double> mk_AllTargetMasses;
@@ -177,7 +171,6 @@ protected:
 	QStringList mk_Peptides;
 	QHash<char, double> mk_AminoAcidWeight;
     QHash<char, QHash<QString, int> > mk_AminoAcidComposition;
-	unsigned int mui_QuantitationResultCount;
     
     QHash<QString, QSet<QString> > mk_UnlabeledRequiredTargetMzForPeptideCharge;
     QHash<QString, QStringList> mk_UnlabeledConsideredLeftTargetMzForPeptideCharge;
@@ -193,7 +186,6 @@ protected:
 	QHash<QString, int> mk_TargetMzIndex;
 	
     k_IsotopeEnvelope mk_IsotopeEnvelope;
-    k_IsotopeEnvelope mk_IsotopeEnvelopeHeavyN15;
     //QHash<QString, QList<double> > mk_IsotopeEnvelopesLight;
 	
 	//QHash<QString, QList<QList<double> > > mk_ElutionProfile;

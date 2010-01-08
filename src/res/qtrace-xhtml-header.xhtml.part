@@ -31,5 +31,5 @@ function toggle(id, flag)
 <body>
 <table>
 <tr>
-<th>filename</th><th>scan id</th><th>peptide</th><th>amount light</th><th>amount heavy</th><th>retention time</th><th>charge</th><th>filter line</th><th>snr</th>
+<th>Filename</th><th>Scan id</th><th>Peptide</th><th>Amount light</th><th>Amount heavy</th><th>Retention time</th><th>Charge</th><th>Filter line</th><th>SNR</th>
 </tr>

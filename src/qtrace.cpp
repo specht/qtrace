@@ -45,28 +45,26 @@ void printUsageAndExit()
     printf("        X denotes any amino acid: 'X 15N' is the same as '15N'.\n");
 	printf("  --scanType [full|sim|all] (default: all)\n");
     printf("  --use [profile|intensity|area] (default: profile)\n");
-	printf("  --isotopeCount [int] (default: 3)\n");
+    printf("      Specify how abundances should be determined.\n");
 	printf("  --minCharge [int] (default: 2)\n");
 	printf("  --maxCharge [int] (default: 3)\n");
 	printf("  --minSnr [float] (default: 2.0)\n");
 	printf("  --massAccuracy (ppm) [float] (default: 5.0)\n");
 	printf("      This mass accuracy is used to check for the presence of peaks.\n");
-	printf("  --excludeMassAccuracy (ppm) [float] (default: 30.0)\n");
-	printf("      This mass accuracy is used to check for the absence of peaks.\n");
+    printf("  --requireAbundance [float] (default: 0.5)\n");
+    printf("      Specify which peaks must be present in an isotope envelope.\n");
+    printf("  --considerAbundance [float] (default: 0.05)\n");
+    printf("      Specify which peaks may additionally be taken into account.\n");
+    printf("  --maxFitError [float] (default: 0.01)\n");
+    printf("      Specify the maximum error allowed when fitting isotope envelopes.\n");
+    printf("  --checkForbiddenPeak [flag] (default: yes)\n");
+    printf("      Specify whether the forbidden peak is required to be absent.\n");
 	printf("  --csvOutput [flag] (default: yes)\n");
 	printf("      Enable or disable CSV output.\n");
 	printf("  --csvOutputTarget [path] (default: stdout)\n");
 	printf("      Redirect CSV output to a file. Enables CSV output.\n");
 	printf("  --xhtmlOutputTarget [path] (default: none)\n");
 	printf("      Output quantitation events as XHTML-embedded SVG to [path].\n");
-	printf("  --checkLightForbiddenPeaks [flag] (default: yes)\n");
-	printf("      Check for light forbidden peak absence.\n");
-	printf("  --checkHeavyForbiddenPeaks [flag] (default: no)\n");
-	printf("      Check for heavy forbidden peak absence.\n");
-/*	printf("  --xhtmlOutput [flag] (default: no)\n");
-	printf("      Enable or disable XHTML output.\n");
-	printf("  --xhtmlOutputTarget [string] (default: stdout)\n");
-	printf("      Redirect XHTML output to a file. Enables XHTML output.\n");*/
     printf("  --logScale [flag] (default: yes)\n");
     printf("      Use logarithmic scale in XHTML spectra.\n");
 	printf("  --quiet\n");
@@ -107,14 +105,14 @@ int main(int ai_ArgumentCount, char** ac_Arguments__)
 	QString ls_Label = "15N";
 	r_ScanType::Enumeration le_ScanType = r_ScanType::All;
     r_AmountEstimation::Enumeration le_AmountEstimation = r_AmountEstimation::Profile;
-	int li_IsotopeCount = 3;
 	int li_MinCharge = 2;
 	int li_MaxCharge = 3;
 	double ld_MinSnr = 2.0;
 	double ld_MassAccuracy = 5.0;
-	double ld_ExcludeMassAccruracy = 30.0;
-	bool lb_CheckLightForbiddenPeaks = true;
-	bool lb_CheckHeavyForbiddenPeaks = false;
+    double ld_RequireAbundance = 0.5;
+    double ld_ConsiderAbundance = 0.05;
+    double ld_MaxFitError = 0.01;
+	bool lb_CheckForbiddenPeak = true;
 	bool lb_PrintStatusMessages = true;
     bool lb_LogScale = true;
 	
@@ -180,14 +178,6 @@ int main(int ai_ArgumentCount, char** ac_Arguments__)
         }
     }
     
-    li_Index = lk_Arguments.indexOf("--isotopeCount");
-	if (li_Index > -1)
-	{
-		li_IsotopeCount = QVariant(lk_Arguments[li_Index + 1]).toInt();
-		lk_Arguments.removeAt(li_Index);
-		lk_Arguments.removeAt(li_Index);
-	}
-	
 	li_Index = lk_Arguments.indexOf("--minCharge");
 	if (li_Index > -1)
 	{
@@ -220,14 +210,30 @@ int main(int ai_ArgumentCount, char** ac_Arguments__)
 		lk_Arguments.removeAt(li_Index);
 	}
 	
-	li_Index = lk_Arguments.indexOf("--excludeMassAccuracy");
-	if (li_Index > -1)
-	{
-		ld_ExcludeMassAccruracy = QVariant(lk_Arguments[li_Index + 1]).toDouble();
-		lk_Arguments.removeAt(li_Index);
-		lk_Arguments.removeAt(li_Index);
-	}
-	
+    li_Index = lk_Arguments.indexOf("--requireAbundance");
+    if (li_Index > -1)
+    {
+        ld_RequireAbundance = QVariant(lk_Arguments[li_Index + 1]).toDouble();
+        lk_Arguments.removeAt(li_Index);
+        lk_Arguments.removeAt(li_Index);
+    }
+    
+    li_Index = lk_Arguments.indexOf("--considerAbundance");
+    if (li_Index > -1)
+    {
+        ld_ConsiderAbundance = QVariant(lk_Arguments[li_Index + 1]).toDouble();
+        lk_Arguments.removeAt(li_Index);
+        lk_Arguments.removeAt(li_Index);
+    }
+    
+    li_Index = lk_Arguments.indexOf("--maxFitError");
+    if (li_Index > -1)
+    {
+        ld_MaxFitError = QVariant(lk_Arguments[li_Index + 1]).toDouble();
+        lk_Arguments.removeAt(li_Index);
+        lk_Arguments.removeAt(li_Index);
+    }
+    
 	li_Index = lk_Arguments.indexOf("--csvOutput");
 	if (li_Index > -1)
 	{
@@ -258,20 +264,11 @@ int main(int ai_ArgumentCount, char** ac_Arguments__)
 		lk_Arguments.removeAt(li_Index);
 	}
 	
-	li_Index = lk_Arguments.indexOf("--checkLightForbiddenPeaks");
+	li_Index = lk_Arguments.indexOf("--checkForbiddenPeak");
 	if (li_Index > -1)
 	{
 		QString ls_Value = lk_Arguments[li_Index + 1];
-		lb_CheckLightForbiddenPeaks = stringToBool(ls_Value);
-		lk_Arguments.removeAt(li_Index);
-		lk_Arguments.removeAt(li_Index);
-	}
-	
-	li_Index = lk_Arguments.indexOf("--checkHeavyForbiddenPeaks");
-	if (li_Index > -1)
-	{
-		QString ls_Value = lk_Arguments[li_Index + 1];
-		lb_CheckHeavyForbiddenPeaks = stringToBool(ls_Value);
+		lb_CheckForbiddenPeak = stringToBool(ls_Value);
 		lk_Arguments.removeAt(li_Index);
 		lk_Arguments.removeAt(li_Index);
 	}
@@ -285,27 +282,6 @@ int main(int ai_ArgumentCount, char** ac_Arguments__)
         lk_Arguments.removeAt(li_Index);
     }
     
-/*	li_Index = lk_Arguments.indexOf("--xhtmlOutput");
-	if (li_Index > -1)
-	{
-		QString ls_Value = lk_Arguments[li_Index + 1];
-		if (!stringToBool(ls_Value))
-			lk_XhtmlDevice_ = NULL;
-		lk_Arguments.removeAt(li_Index);
-		lk_Arguments.removeAt(li_Index);
-	}
-	
-	li_Index = lk_Arguments.indexOf("--xhtmlOutputTarget");
-	if (li_Index > -1)
-	{
-		lk_pXhtmlOutFile = RefPtr<QFile>(new QFile(lk_Arguments[li_Index + 1]));
-		lk_pXhtmlOutFile->open(QIODevice::WriteOnly);
-		lk_XhtmlDevice_ = lk_pXhtmlOutFile.get_Pointer();
-		lk_Arguments.removeAt(li_Index);
-		lk_Arguments.removeAt(li_Index);
-	}
-	*/
-	
 	li_Index = lk_Arguments.indexOf("--quiet");
 	if (li_Index > -1)
 	{
@@ -318,10 +294,10 @@ int main(int ai_ArgumentCount, char** ac_Arguments__)
 	k_Quantifier 
         lk_Quantifier(ls_Label, le_ScanType, le_AmountEstimation,
                       QList<tk_IntPair>() << tk_IntPair(1, 1),
-                      li_IsotopeCount, li_MinCharge, li_MaxCharge, ld_MinSnr, 
-                      ld_MassAccuracy, ld_ExcludeMassAccruracy, lk_CsvDevice_, 
-                      lk_XhtmlDevice_, lb_CheckLightForbiddenPeaks, 
-                      lb_CheckHeavyForbiddenPeaks, 
+                      li_MinCharge, li_MaxCharge, ld_MinSnr, 
+                      ld_MassAccuracy, ld_RequireAbundance, 
+                      ld_ConsiderAbundance, ld_MaxFitError, lk_CsvDevice_, 
+                      lk_XhtmlDevice_, lb_CheckForbiddenPeak, 
                       lb_PrintStatusMessages, lb_LogScale);
 		
 	QStringList lk_SpectraFiles;
