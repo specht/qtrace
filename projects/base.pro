@@ -16,6 +16,10 @@ macx {
 	QMAKE_MACOSX_DEPLOYMENT_TARGET = 10.4
 }
 
+linux {
+	CONFIG += static
+}
+
 LIBS += -lptb -lz -lbz2 -lquazip
 
 CONFIG(debug, debug|release) {

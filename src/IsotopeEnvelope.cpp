@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2009 Michael Specht
+Copyright (c) 2009-2010 Michael Specht
 
 This file is part of qTrace.
 

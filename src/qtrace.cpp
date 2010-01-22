@@ -37,7 +37,7 @@ void printUsageAndExit()
     printf("      RP 13C: 13C in all arginine and proline residues\n");
     printf("      RPK 13C 15N: 13C and 15N in all arginine, proline and lysine residues\n");
     printf("      R 13C K 15N: 13C in arginine, 15N in lysine residues\n");
-    printf("      15N (0.99): 99%% 15N in all amino acids (1%% is N14)\n");
+    printf("      15N (0.99): 99%% 15N in all amino acids (remaining 1%% is N14)\n");
     printf("      The exact syntax is:\n");
     printf("        ((amino acid)* (isotope)+ (efficiency)? )+\n");
     printf("      Notes:\n");
@@ -291,15 +291,6 @@ int main(int ai_ArgumentCount, char** ac_Arguments__)
 	
 	//RefPtr<QIODevice> lk_pTextDevice(new QIODevice(stdout));
 	
-	k_Quantifier 
-        lk_Quantifier(ls_Label, le_ScanType, le_AmountEstimation,
-                      QList<tk_IntPair>() << tk_IntPair(1, 1),
-                      li_MinCharge, li_MaxCharge, ld_MinSnr, 
-                      ld_MassAccuracy, ld_RequireAbundance, 
-                      ld_ConsiderAbundance, ld_MaxFitError, lk_CsvDevice_, 
-                      lk_XhtmlDevice_, lb_CheckForbiddenPeak, 
-                      lb_PrintStatusMessages, lb_LogScale);
-		
 	QStringList lk_SpectraFiles;
 	QStringList lk_Peptides;
 	while (!lk_Arguments.empty())
@@ -347,6 +338,15 @@ int main(int ai_ArgumentCount, char** ac_Arguments__)
 	if (lk_SpectraFiles.empty() || lk_Peptides.empty())
 		printUsageAndExit();
 		
+    k_Quantifier 
+        lk_Quantifier(ls_Label, le_ScanType, le_AmountEstimation,
+                      QList<tk_IntPair>() << tk_IntPair(1, 1),
+                      li_MinCharge, li_MaxCharge, ld_MinSnr, 
+                      ld_MassAccuracy, ld_RequireAbundance, 
+                      ld_ConsiderAbundance, ld_MaxFitError, lk_CsvDevice_, 
+                      lk_XhtmlDevice_, lb_CheckForbiddenPeak, 
+                      lb_PrintStatusMessages, lb_LogScale);
+        
 	// remove duplicate peptides
 	QSet<QString> lk_PeptidesSet = lk_Peptides.toSet();
 	lk_Peptides = lk_PeptidesSet.toList();
