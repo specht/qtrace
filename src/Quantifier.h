@@ -20,7 +20,7 @@ along with qTrace.  If not, see <http://www.gnu.org/licenses/>.
 #pragma once
 #include <QtCore>
 #include <ptb/ScanIterator.h>
-#include "IsotopeEnvelope.h"
+#include <ptb/IsotopeEnvelope.h>
 
 
 struct r_IsotopeAbundance
