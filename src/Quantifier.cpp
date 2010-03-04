@@ -820,7 +820,8 @@ QString k_Quantifier::renderScanAsSvg(r_Scan& ar_Scan, r_ScanQuantitationResult 
 	double ld_BorderRight = 16.0;
 	double ld_BorderBottom = 4.0;
 	double ld_BorderLeft = 16.0;
-	
+
+    ar_QuantitationResult.md_MaxMz = ar_QuantitationResult.md_MinMz + 20.0;
 	if (ar_QuantitationResult.md_MinMz == 0.0)
 		ar_QuantitationResult.md_MinMz = ar_Scan.mr_Spectrum.md_MzValues_[0];
 	if (ar_QuantitationResult.md_MaxMz == 0.0)
