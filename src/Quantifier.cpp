@@ -334,7 +334,7 @@ void k_Quantifier::quantify(QStringList ak_SpectraFiles, QStringList ak_Peptides
 		QFile lk_File(":res/qtrace-xhtml-header.xhtml.part");
 		lk_File.open(QIODevice::ReadOnly);
 		QByteArray lk_Content = lk_File.readAll();
-		mk_XhtmlOutStream << QString(lk_Content);
+// 		mk_XhtmlOutStream << QString(lk_Content);
 		lk_File.close();
 	}
 		
@@ -356,7 +356,7 @@ void k_Quantifier::quantify(QStringList ak_SpectraFiles, QStringList ak_Peptides
 		QFile lk_File(":res/qtrace-xhtml-footer.xhtml.part");
 		lk_File.open(QIODevice::ReadOnly);
 		QByteArray lk_Content = lk_File.readAll();
-		mk_XhtmlOutStream << QString(lk_Content);
+// 		mk_XhtmlOutStream << QString(lk_Content);
 		lk_File.close();
 	}
 }
@@ -649,26 +649,7 @@ void k_Quantifier::handleScan(r_Scan& ar_Scan)
                     
                     if (mk_XhtmlOutStream.device())
                     {
-                        mk_XhtmlOutStream << QString("\n<!-- BEGIN PEPTIDE %1 -->\n").arg(ls_Peptide); 
-                        mk_XhtmlOutStream << "<tr>"
-                            << "<td>" << ms_CurrentSpot << "</td>"
-                            << "<td>" << ar_Scan.ms_Id << "</td>"
-                            << "<td>" << ls_Peptide << "</td>"
-                            << "<td>" << lr_ScanResult.md_AmountUnlabeled << "</td>"
-                            << "<td>" << lr_ScanResult.md_AmountLabeled << "</td>"
-                            << "<td>" << ar_Scan.md_RetentionTime << "</td>"
-                            << "<td>" << lr_ScanResult.mi_Charge << "</td>"
-                            << "<td>" << ar_Scan.ms_FilterLine << "</td>"
-                            << "<td>" << lr_ScanResult.md_Snr << "</td>"
-                            << "</tr>"
-                            << endl;
-                        QString ls_Svg = this->renderScanAsSvg(ar_Scan, lr_ScanResult);
-                        ls_Svg.remove(QRegExp("<\\?xml.+\\?>"));
-                        ls_Svg.replace(QRegExp("width=\\\"[^\\\"]*\\\"\\s+height=\\\"[^\\\"]*\\\""), "width='950' height='238'");
-                        mk_XhtmlOutStream << "<div style='background-color: #fff;' width='950' height='238'>";
-                        mk_XhtmlOutStream << ls_Svg;
-                        mk_XhtmlOutStream << "</div>" << endl;
-                        mk_XhtmlOutStream << QString("\n<!-- END PEPTIDE %1 -->\n").arg(ls_Peptide); 
+                        mk_XhtmlOutStream << this->renderScanAsSvg(ar_Scan, lr_ScanResult);
                     }
                 }
             }
@@ -814,14 +795,15 @@ double k_Quantifier::calculatePeptideMass(QString as_Peptide, int ai_Charge)
 QString k_Quantifier::renderScanAsSvg(r_Scan& ar_Scan, r_ScanQuantitationResult ar_QuantitationResult)
 {
 	double ld_Ratio = 4.0;
-	double ld_Width = 950.0;
+	double ld_Width = 1188.0;
 	double ld_Height = ld_Width / ld_Ratio;
 	double ld_BorderTop = 4.0;
 	double ld_BorderRight = 16.0;
 	double ld_BorderBottom = 4.0;
 	double ld_BorderLeft = 16.0;
 
-    ar_QuantitationResult.md_MaxMz = ar_QuantitationResult.md_MinMz + 20.0;
+    ar_QuantitationResult.md_MinMz = 1219.0;
+    ar_QuantitationResult.md_MaxMz = 1235.0;
 	if (ar_QuantitationResult.md_MinMz == 0.0)
 		ar_QuantitationResult.md_MinMz = ar_Scan.mr_Spectrum.md_MzValues_[0];
 	if (ar_QuantitationResult.md_MaxMz == 0.0)
@@ -874,7 +856,8 @@ QString k_Quantifier::renderScanAsSvg(r_Scan& ar_Scan, r_ScanQuantitationResult 
     else
         lk_Lines << 0.2 << 0.4 << 0.6 << 0.8 << 1.0;
             
-	double x0 = ld_BorderLeft;
+    ar_QuantitationResult.md_LabeledProfileScale = 0.05;
+    double x0 = ld_BorderLeft;
 	double y0 = ld_Height - ld_BorderBottom;
 	double dx = (ld_Width - ld_BorderLeft - ld_BorderRight) / (xmax - xmin);
 	double dy = -(ld_Height - ld_BorderTop - ld_BorderBottom);
@@ -883,6 +866,7 @@ QString k_Quantifier::renderScanAsSvg(r_Scan& ar_Scan, r_ScanQuantitationResult 
 	{
 		QSvgGenerator lk_Generator;
 		lk_Generator.setSize(QSize((int)ld_Width, (int)ld_Height));
+        lk_Generator.setViewBox(QRect(0, 0, (int)ld_Width, (int)ld_Height));
 		lk_Generator.setOutputDevice(&lk_Buffer);
 		
 		QPainter lk_Painter(&lk_Generator);
@@ -908,12 +892,13 @@ QString k_Quantifier::renderScanAsSvg(r_Scan& ar_Scan, r_ScanQuantitationResult 
         tk_IsotopeEnvelope lk_IsotopeEnvelope;
         bool lb_DrawnOnePoint;
         double ld_LastMz;
-        
+
         lk_IsotopeEnvelope = mk_UnlabeledIsotopeEnvelopeForPeptideCharge[ls_PeptideChargeKey];
         double ld_PeptideChargeBaseMz = calculatePeptideMass(ls_Peptide, li_Charge);
         lb_DrawnOnePoint = false;
         ld_LastMz = 0.0;
         QPainterPath lk_Path;
+        /*
         for (int i = 0; i < lk_IsotopeEnvelope.size(); ++i)
         {
             double ld_Abundance = lk_IsotopeEnvelope[i].first * ar_QuantitationResult.md_UnlabeledProfileScale;
@@ -946,6 +931,7 @@ QString k_Quantifier::renderScanAsSvg(r_Scan& ar_Scan, r_ScanQuantitationResult 
         lk_Painter.setBrush(QBrush(QColor(224, 224, 224, 128)));
         
         lk_Painter.drawPath(lk_Path);
+        */
 		
         lk_IsotopeEnvelope = mk_LabeledIsotopeEnvelopeForPeptideCharge[ls_PeptideChargeKey];
         lb_DrawnOnePoint = false;
@@ -957,7 +943,7 @@ QString k_Quantifier::renderScanAsSvg(r_Scan& ar_Scan, r_ScanQuantitationResult 
             double ld_Mz = lk_IsotopeEnvelope[i].second / li_Charge;
             ld_Mz += ld_PeptideChargeBaseMz;
             double x = (ld_Mz - xmin) * dx + x0;
-            double y = this->scale(ld_Abundance / ymax) / ymaxScaled;
+            double y = this->scale(ld_Abundance);
             if (y > 0.001)
             {
                 y = y * dy + y0;
@@ -994,19 +980,19 @@ QString k_Quantifier::renderScanAsSvg(r_Scan& ar_Scan, r_ScanQuantitationResult 
 		
 		// draw target m/z lines
 		foreach (double ld_Mz, ar_QuantitationResult.mk_TargetMz)
-		{
+/*		{
 			double x = (ld_Mz - xmin) * dx + x0;
 			lk_Painter.drawLine(QPointF(x, y0), QPointF(x, y0 + dy));
-		}
+		}*/
 		
 		lk_Pen.setColor(QColor(TANGO_SCARLET_RED_1));
 		lk_Painter.setPen(lk_Pen);
 		// draw forbidden m/z lines
-		foreach (double ld_Mz, ar_QuantitationResult.mk_ForbiddenMz)
+/*		foreach (double ld_Mz, ar_QuantitationResult.mk_ForbiddenMz)
 		{
 			double x = (ld_Mz - xmin) * dx + x0;
 			lk_Painter.drawLine(QPointF(x, y0), QPointF(x, y0 + dy));
-		}
+		}*/
 		
 		lk_Pen.setColor(QColor(192, 192, 192));
 		lk_Painter.setPen(lk_Pen);
@@ -1032,39 +1018,39 @@ QString k_Quantifier::renderScanAsSvg(r_Scan& ar_Scan, r_ScanQuantitationResult 
 									this->scale(ar_Scan.mr_Spectrum.md_IntensityValues_[i] / ymax) / ymaxScaled * dy + y0));
 		lk_Painter.drawPolyline(QPolygonF(lk_Points));
 		
-		foreach (r_Peak lr_Peak, ar_QuantitationResult.mk_UnlabeledPeaks)
-		{
-			// draw Gaussian
-			lk_Pen.setWidthF(1.0);
-			lk_Pen.setJoinStyle(Qt::RoundJoin);
-			lk_Pen.setColor(QColor(ar_QuantitationResult.md_UnlabeledError <= md_MaxFitError ? TANGO_SKY_BLUE_1 : TANGO_SCARLET_RED_1));
-			lk_Pen.setStyle(Qt::SolidLine);
-			lk_Painter.setPen(lk_Pen);
-			
-			QVector<QPointF> lk_Points;
-			double w = sqrt(lr_Peak.md_GaussC) / 2.0;
-			for (double x = lr_Peak.md_PeakMz - w; x <= lr_Peak.md_PeakMz + w; x += w * 0.05)
-				lk_Points.append(QPointF((x - xmin) * dx + x0, 
-										this->scale(gaussian(x, lr_Peak.md_GaussA, lr_Peak.md_GaussB, lr_Peak.md_GaussC) / ymax) / ymaxScaled * dy + y0));
-			lk_Painter.drawPolyline(QPolygonF(lk_Points));
-		}
-        
-        foreach (r_Peak lr_Peak, ar_QuantitationResult.mk_LabeledPeaks)
-        {
-            // draw Gaussian
-            lk_Pen.setWidthF(1.0);
-            lk_Pen.setJoinStyle(Qt::RoundJoin);
-            lk_Pen.setColor(QColor(ar_QuantitationResult.md_LabeledError <= md_MaxFitError ? TANGO_SKY_BLUE_1 : TANGO_SCARLET_RED_1));
-            lk_Pen.setStyle(Qt::SolidLine);
-            lk_Painter.setPen(lk_Pen);
-            
-            QVector<QPointF> lk_Points;
-            double w = sqrt(lr_Peak.md_GaussC) / 2.0;
-            for (double x = lr_Peak.md_PeakMz - w; x <= lr_Peak.md_PeakMz + w; x += w * 0.05)
-                lk_Points.append(QPointF((x - xmin) * dx + x0, 
-                                        this->scale(gaussian(x, lr_Peak.md_GaussA, lr_Peak.md_GaussB, lr_Peak.md_GaussC) / ymax) / ymaxScaled * dy + y0));
-            lk_Painter.drawPolyline(QPolygonF(lk_Points));
-        }
+// 		foreach (r_Peak lr_Peak, ar_QuantitationResult.mk_UnlabeledPeaks)
+// 		{
+// 			// draw Gaussian
+// 			lk_Pen.setWidthF(1.0);
+// 			lk_Pen.setJoinStyle(Qt::RoundJoin);
+// 			lk_Pen.setColor(QColor(ar_QuantitationResult.md_UnlabeledError <= md_MaxFitError ? TANGO_SKY_BLUE_1 : TANGO_SCARLET_RED_1));
+// 			lk_Pen.setStyle(Qt::SolidLine);
+// 			lk_Painter.setPen(lk_Pen);
+// 			
+// 			QVector<QPointF> lk_Points;
+// 			double w = sqrt(lr_Peak.md_GaussC) / 2.0;
+// 			for (double x = lr_Peak.md_PeakMz - w; x <= lr_Peak.md_PeakMz + w; x += w * 0.05)
+// 				lk_Points.append(QPointF((x - xmin) * dx + x0, 
+// 										this->scale(gaussian(x, lr_Peak.md_GaussA, lr_Peak.md_GaussB, lr_Peak.md_GaussC) / ymax) / ymaxScaled * dy + y0));
+// 			lk_Painter.drawPolyline(QPolygonF(lk_Points));
+// 		}
+//         
+//         foreach (r_Peak lr_Peak, ar_QuantitationResult.mk_LabeledPeaks)
+//         {
+//             // draw Gaussian
+//             lk_Pen.setWidthF(1.0);
+//             lk_Pen.setJoinStyle(Qt::RoundJoin);
+//             lk_Pen.setColor(QColor(ar_QuantitationResult.md_LabeledError <= md_MaxFitError ? TANGO_SKY_BLUE_1 : TANGO_SCARLET_RED_1));
+//             lk_Pen.setStyle(Qt::SolidLine);
+//             lk_Painter.setPen(lk_Pen);
+//             
+//             QVector<QPointF> lk_Points;
+//             double w = sqrt(lr_Peak.md_GaussC) / 2.0;
+//             for (double x = lr_Peak.md_PeakMz - w; x <= lr_Peak.md_PeakMz + w; x += w * 0.05)
+//                 lk_Points.append(QPointF((x - xmin) * dx + x0, 
+//                                         this->scale(gaussian(x, lr_Peak.md_GaussA, lr_Peak.md_GaussB, lr_Peak.md_GaussC) / ymax) / ymaxScaled * dy + y0));
+//             lk_Painter.drawPolyline(QPolygonF(lk_Points));
+//         }
 	}
 	lk_Buffer.close();
 	lk_Buffer.open(QBuffer::ReadOnly);
