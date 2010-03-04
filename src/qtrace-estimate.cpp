@@ -27,25 +27,10 @@ along with SimQuant.  If not, see <http://www.gnu.org/licenses/>.
 
 void printUsageAndExit()
 {
-	printf("Usage: qtrace [options] --spectraFiles [spectra files] --peptides [peptides] --peptideFiles [peptide files]\n");
-	printf("Spectra files may be mzData, mzXML or mzML, optionally compressed (.gz|.bz2|.zip).\n");
+	printf("Usage: qtrace-estimate [options] [spectra file] [peptide 1] [RT 1] [peptide 2] ...\n");
+	printf("The spectra file may be mzData, mzXML or mzML, optionally compressed (.gz|.bz2|.zip).\n");
 	printf("Options:\n");
-	printf("  --label <string> (default: 15N)\n");
-    printf("      Specify the label here. Examples:\n");
-    printf("      15N: 15N in all amino acids\n");
-    printf("      R 13C: 13C in all arginine residues\n");
-    printf("      RP 13C: 13C in all arginine and proline residues\n");
-    printf("      RPK 13C 15N: 13C and 15N in all arginine, proline and lysine residues\n");
-    printf("      R 13C K 15N: 13C in arginine, 15N in lysine residues\n");
-    printf("      15N (0.99): 99%% 15N in all amino acids (remaining 1%% is N14)\n");
-    printf("      The exact syntax is:\n");
-    printf("        ((amino acid)* (isotope)+ (labeling efficiency)? )+\n");
-    printf("      Notes:\n");
-    printf("        Labeling efficiencies can only be specified for C and N.\n");
-    printf("        X denotes any amino acid: 'X 15N' is the same as '15N'.\n");
 	printf("  --scanType [full|sim|all] (default: all)\n");
-    printf("  --use [profile|intensity|area] (default: profile)\n");
-    printf("      Specify how abundances should be determined.\n");
 	printf("  --minCharge [int] (default: 2)\n");
 	printf("  --maxCharge [int] (default: 3)\n");
 	printf("  --minSnr [float] (default: 2.0)\n");
@@ -55,8 +40,6 @@ void printUsageAndExit()
     printf("      Specify which peaks must be present in an isotope envelope.\n");
     printf("  --considerAbundance [float] (default: 0.05)\n");
     printf("      Specify which peaks may additionally be taken into account.\n");
-    printf("  --maxFitError [float] (default: 0.01)\n");
-    printf("      Specify the maximum error allowed when fitting isotope envelopes.\n");
     printf("  --checkForbiddenPeak [flag] (default: yes)\n");
     printf("      Specify whether the forbidden peak is required to be absent.\n");
 	printf("  --csvOutput [flag] (default: yes)\n");
@@ -98,7 +81,7 @@ int main(int ai_ArgumentCount, char** ac_Arguments__)
 		
 	if (!lk_Arguments.empty() && (lk_Arguments.first() == "--version"))
 	{
-		printf("qtrace %s\n", gs_Version.toStdString().c_str());
+		printf("qtrace-estimate %s\n", gs_Version.toStdString().c_str());
 		exit(0);
 	}
 
@@ -129,14 +112,6 @@ int main(int ai_ArgumentCount, char** ac_Arguments__)
 	// consume options
 	int li_Index;
 	
-	li_Index = lk_Arguments.indexOf("--label");
-	if (li_Index > -1)
-	{
-		ls_Label = lk_Arguments[li_Index + 1];
-		lk_Arguments.removeAt(li_Index);
-		lk_Arguments.removeAt(li_Index);
-	}
-	
 	li_Index = lk_Arguments.indexOf("--scanType");
 	if (li_Index > -1)
 	{
@@ -159,25 +134,6 @@ int main(int ai_ArgumentCount, char** ac_Arguments__)
 		}
 	}
 	
-    li_Index = lk_Arguments.indexOf("--use");
-    if (li_Index > -1)
-    {
-        QString ls_Use = lk_Arguments[li_Index + 1];
-        lk_Arguments.removeAt(li_Index);
-        lk_Arguments.removeAt(li_Index);
-        if (ls_Use == "intensity")
-            le_AmountEstimation = r_AmountEstimation::Intensity;
-        else if (ls_Use == "area")
-            le_AmountEstimation = r_AmountEstimation::Area;
-        else if (ls_Use == "profile")
-            le_AmountEstimation = r_AmountEstimation::Profile;
-        else
-        {
-            printf("Error: unknown 'use' parameter %s.\n", ls_Use.toStdString().c_str());
-            exit(1);
-        }
-    }
-    
 	li_Index = lk_Arguments.indexOf("--minCharge");
 	if (li_Index > -1)
 	{
@@ -292,49 +248,19 @@ int main(int ai_ArgumentCount, char** ac_Arguments__)
 	//RefPtr<QIODevice> lk_pTextDevice(new QIODevice(stdout));
 	
 	QStringList lk_SpectraFiles;
-	QStringList lk_Peptides;
-	while (!lk_Arguments.empty())
-	{
-		if (lk_Arguments.first() == "--spectraFiles")
-		{
-			lk_Arguments.removeFirst();
-			while (!lk_Arguments.empty() && !lk_Arguments.first().startsWith("-"))
-				lk_SpectraFiles << lk_Arguments.takeFirst();
-		}
-		else if (lk_Arguments.first() == "--peptides")
-		{
-			lk_Arguments.removeFirst();
-			while (!lk_Arguments.empty() && !lk_Arguments.first().startsWith("-"))
-				lk_Peptides.push_back(lk_Arguments.takeFirst().toUpper());
-		}
-		else if (lk_Arguments.first() == "--peptideFiles")
-		{
-			lk_Arguments.removeFirst();
-			while (!lk_Arguments.empty() && !lk_Arguments.first().startsWith("-"))
-			{	
-				QString ls_Path = lk_Arguments.takeFirst();
-				QFile lk_File(ls_Path);
-				if (!lk_File.open(QIODevice::ReadOnly))
-				{
-					printf("Error: Unable to open %s.\n", ls_Path.toStdString().c_str());
-					exit(1);
-				}
-				QTextStream lk_Stream(&lk_File);
-				while (!lk_Stream.atEnd())
-				{
-					QString ls_Line = lk_Stream.readLine().trimmed();
-					if (!ls_Line.startsWith(">"))
-						lk_Peptides.push_back(ls_Line.toUpper());
-				}
-			}
-		}
-		else
-		{
-			printf("Error: Unknown command line switch: %s\n", lk_Arguments.first().toStdString().c_str());
-			exit(1);
-		}
-	}
-	
+    QHash<QString, double> lk_Peptides;
+    
+    lk_SpectraFiles.append(lk_Arguments.takeFirst());
+    while (!lk_Arguments.empty())
+    {
+        if (lk_Arguments.size() >= 2)
+        {
+            QString ls_Peptide = lk_Arguments.takeFirst();
+            QString ls_Rt = lk_Arguments.takeFirst();
+            lk_Peptides[ls_Peptide] = ls_Rt.toDouble();
+        }
+    }
+    
 	if (lk_SpectraFiles.empty() || lk_Peptides.empty())
 		printUsageAndExit();
 		
@@ -347,9 +273,5 @@ int main(int ai_ArgumentCount, char** ac_Arguments__)
                       lk_XhtmlDevice_, lb_CheckForbiddenPeak, 
                       lb_PrintStatusMessages, lb_LogScale);
         
-	// remove duplicate peptides
-	QSet<QString> lk_PeptidesSet = lk_Peptides.toSet();
-	lk_Peptides = lk_PeptidesSet.toList();
-		
-	lk_Quantifier.quantify(lk_SpectraFiles, lk_Peptides);
+	lk_Quantifier.quantify(lk_SpectraFiles, lk_Peptides.keys());
 }

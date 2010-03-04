@@ -106,22 +106,19 @@ typedef QPair<double, double> tk_DoublePair;
 class k_Quantifier: public k_ScanIterator
 {
 public:
-	k_Quantifier(QString as_Label = "15N",
-				 r_ScanType::Enumeration ae_ScanType = r_ScanType::All,
-                 r_AmountEstimation::Enumeration ab_UseArea = r_AmountEstimation::Profile,
-				 QList<tk_IntPair> ak_MsLevels = QList<tk_IntPair>() << tk_IntPair(0, 0x10000),
-				 int ai_MinCharge = 2, int ai_MaxCharge = 3, 
-				 double ad_MinSnr = 2.0, double ad_MassAccuracy = 5.0,
-                 double ad_RequireAbundance = 0.5,
-                 double ad_ConsiderAbundance = 0.05,
-                 double ad_MaxFitError = 0.01,
-				 QIODevice* ak_CsvOutDevice_ = NULL, QIODevice* ak_XhtmlOutDevice_ = NULL,
-				 bool ab_CheckForbiddenPeak = true,
-				 bool ab_PrintStatusMessages = true,
-                 bool ab_LogScale = true);
+	k_Quantifier(QString as_Label, r_ScanType::Enumeration ae_ScanType,
+                 r_AmountEstimation::Enumeration ab_UseArea,
+				 QList<tk_IntPair> ak_MsLevels,
+				 int ai_MinCharge, int ai_MaxCharge, 
+				 double ad_MinSnr, double ad_MassAccuracy,
+                 double ad_RequireAbundance, double ad_ConsiderAbundance,
+                 double ad_MaxFitError, QIODevice* ak_CsvOutDevice_, 
+                 QIODevice* ak_XhtmlOutDevice_, bool ab_CheckForbiddenPeak, 
+                 bool ab_PrintStatusMessages, bool ab_LogScale);
 	virtual ~k_Quantifier();
 	
-	// quantify takes a list of spectra files and a hash of (peptide => protein) entries
+	// quantify takes a list of spectra files and a list of peptides
+    // qTrace only quantifies on the peptide level
 	virtual void quantify(QStringList ak_SpectraFiles, QStringList ak_Peptides);
 	virtual void handleScan(r_Scan& ar_Scan);
 	virtual void progressFunction(QString as_ScanId, bool ab_InterestingScan);
