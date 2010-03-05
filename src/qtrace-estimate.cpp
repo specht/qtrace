@@ -27,7 +27,7 @@ along with SimQuant.  If not, see <http://www.gnu.org/licenses/>.
 
 void printUsageAndExit()
 {
-	printf("Usage: qtrace-estimate [options] [spectra file] [peptide 1] [RT 1] [peptide 2] ...\n");
+	printf("Usage: qtrace-estimate [options] [spectra file] [peptide 1] [RT 1] [peptide 2] [RT 2]...\n");
 	printf("The spectra file may be mzData, mzXML or mzML, optionally compressed (.gz|.bz2|.zip).\n");
 	printf("Options:\n");
 	printf("  --scanType [full|sim|all] (default: all)\n");
@@ -250,6 +250,9 @@ int main(int ai_ArgumentCount, char** ac_Arguments__)
 	QStringList lk_SpectraFiles;
     QHash<QString, double> lk_Peptides;
     
+    if (lk_Arguments.empty())
+        printUsageAndExit();
+    
     lk_SpectraFiles.append(lk_Arguments.takeFirst());
     while (!lk_Arguments.empty())
     {
@@ -273,5 +276,5 @@ int main(int ai_ArgumentCount, char** ac_Arguments__)
                       lk_XhtmlDevice_, lb_CheckForbiddenPeak, 
                       lb_PrintStatusMessages, lb_LogScale);
         
-	lk_Quantifier.quantify(lk_SpectraFiles, lk_Peptides.keys());
+	lk_Quantifier.estimate(lk_SpectraFiles, lk_Peptides);
 }

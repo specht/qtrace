@@ -99,8 +99,8 @@ struct r_Bucket
 
 // peptide => scan results
 typedef QHash<QString, QList<r_ScanQuantitationResult> > tk_SpotResults;
-
 typedef QPair<double, double> tk_DoublePair;
+typedef QHash<QString, double> tk_StringDoubleHash;
 
 
 class k_Quantifier: public k_ScanIterator
@@ -120,6 +120,11 @@ public:
 	// quantify takes a list of spectra files and a list of peptides
     // qTrace only quantifies on the peptide level
 	virtual void quantify(QStringList ak_SpectraFiles, QStringList ak_Peptides);
+    
+    // estimate takes a list of spectra files and a hash of 
+    // peptide => retention time
+    virtual void estimate(QStringList ak_SpectraFiles, tk_StringDoubleHash ak_Peptides);
+    
 	virtual void handleScan(r_Scan& ar_Scan);
 	virtual void progressFunction(QString as_ScanId, bool ab_InterestingScan);
 	
@@ -166,6 +171,7 @@ protected:
 	QList<double> mk_AllTargetMasses;
 	QString ms_CurrentSpot;
 	QStringList mk_Peptides;
+    tk_StringDoubleHash mk_PeptideRetentionTime;
 	QHash<char, double> mk_AminoAcidWeight;
     QHash<char, QHash<QString, int> > mk_AminoAcidComposition;
     
