@@ -27,7 +27,7 @@ along with SimQuant.  If not, see <http://www.gnu.org/licenses/>.
 
 void printUsageAndExit()
 {
-	printf("Usage: qtrace-estimate [options] [spectra file] [peptide 1] [RT 1] [peptide 2] [RT 2]...\n");
+	printf("Usage: qtrace-estimate [options] [spectra file] [peptide] [retention time]\n");
 	printf("The spectra file may be mzData, mzXML or mzML, optionally compressed (.gz|.bz2|.zip).\n");
 	printf("Options:\n");
 	printf("  --scanType [full|sim|all] (default: all)\n");
@@ -87,7 +87,7 @@ int main(int ai_ArgumentCount, char** ac_Arguments__)
 
 	QString ls_Label = "15N";
 	r_ScanType::Enumeration le_ScanType = r_ScanType::All;
-    r_AmountEstimation::Enumeration le_AmountEstimation = r_AmountEstimation::Profile;
+    r_AmountEstimation::Enumeration le_AmountEstimation = r_AmountEstimation::Intensity;
 	int li_MinCharge = 2;
 	int li_MaxCharge = 3;
 	double ld_MinSnr = 2.0;
@@ -254,17 +254,24 @@ int main(int ai_ArgumentCount, char** ac_Arguments__)
         printUsageAndExit();
     
     lk_SpectraFiles.append(lk_Arguments.takeFirst());
-    while (!lk_Arguments.empty())
+    
+    QString ls_Peptide;
+    double ld_RetentionTime;
+    if (lk_Arguments.size() < 2)
     {
-        if (lk_Arguments.size() >= 2)
-        {
-            QString ls_Peptide = lk_Arguments.takeFirst();
-            QString ls_Rt = lk_Arguments.takeFirst();
-            lk_Peptides[ls_Peptide] = ls_Rt.toDouble();
-        }
+        printf("Error: Peptide and retention time must be specified.\n");
+        exit(1);
+    }
+    ls_Peptide = lk_Arguments.takeFirst();
+    bool lb_Ok = false;
+    ld_RetentionTime = lk_Arguments.takeFirst().toDouble(&lb_Ok);
+    if (!lb_Ok)
+    {
+        printf("Error: Invalid retention time specified.\n");
+        exit(1);
     }
     
-	if (lk_SpectraFiles.empty() || lk_Peptides.empty())
+	if (lk_SpectraFiles.empty())
 		printUsageAndExit();
 		
     k_Quantifier 
@@ -276,5 +283,15 @@ int main(int ai_ArgumentCount, char** ac_Arguments__)
                       lk_XhtmlDevice_, lb_CheckForbiddenPeak, 
                       lb_PrintStatusMessages, lb_LogScale);
         
-	lk_Quantifier.estimate(lk_SpectraFiles, lk_Peptides);
+	tk_ScanWithChargeList lk_ScanList = lk_Quantifier.estimate(lk_SpectraFiles, ls_Peptide, ld_RetentionTime);
+    QList<QList<r_Peak> > lk_PeaksForScan;
+    
+    // now check the scan list
+    foreach (tk_IntScanPair lk_IntScanPair, lk_ScanList)
+    {
+        int li_Charge = lk_IntScanPair.first;
+        r_Scan lr_Scan = lk_IntScanPair.second;
+        lk_PeaksForScan << k_ScanIterator::findAllPeaks(lr_Scan.mr_Spectrum);
+        printf("%d / %s (%d peaks)\n", li_Charge, lr_Scan.ms_Id.toStdString().c_str(), lk_PeaksForScan.last().size());
+    }
 }

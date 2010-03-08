@@ -45,6 +45,9 @@ struct r_IsotopeAbundance
 // which the abundances of the isotopes are modified (like 99% 15N)
 typedef QHash<QString, r_IsotopeAbundance> tk_ArtificialEnvironment;
 
+typedef QPair<int, r_Scan> tk_IntScanPair;
+typedef QList<tk_IntScanPair> tk_ScanWithChargeList;
+
 
 struct r_AmountEstimation
 {
@@ -119,11 +122,12 @@ public:
 	
 	// quantify takes a list of spectra files and a list of peptides
     // qTrace only quantifies on the peptide level
-	virtual void quantify(QStringList ak_SpectraFiles, QStringList ak_Peptides);
+	virtual void quantify(QStringList ak_SpectraFiles, QStringList ak_Peptides, bool ab_Estimate = false);
     
     // estimate takes a list of spectra files and a hash of 
-    // peptide => retention time
-    virtual void estimate(QStringList ak_SpectraFiles, tk_StringDoubleHash ak_Peptides);
+    // peptide => retention time and returns a list of scans which where just right
+    // for the peptide
+    virtual tk_ScanWithChargeList estimate(QStringList ak_SpectraFiles, QString as_Peptide, double ad_RetentionTime);
     
 	virtual void handleScan(r_Scan& ar_Scan);
 	virtual void progressFunction(QString as_ScanId, bool ab_InterestingScan);
@@ -171,7 +175,7 @@ protected:
 	QList<double> mk_AllTargetMasses;
 	QString ms_CurrentSpot;
 	QStringList mk_Peptides;
-    tk_StringDoubleHash mk_PeptideRetentionTime;
+    double md_EstimateRetentionTime;
 	QHash<char, double> mk_AminoAcidWeight;
     QHash<char, QHash<QString, int> > mk_AminoAcidComposition;
     
@@ -197,4 +201,6 @@ protected:
     
     QHash<QString, k_IsotopeEnvelope> mk_HeavyIsotopeEnvelopeForAminoAcid;
     QHash<QString, tk_ArtificialEnvironment> mk_Label;
+    bool mb_Estimate;
+    tk_ScanWithChargeList mk_ScanWithChargeList;
 };
