@@ -46,7 +46,7 @@ struct r_IsotopeAbundance
 typedef QHash<QString, r_IsotopeAbundance> tk_ArtificialEnvironment;
 
 typedef QPair<int, r_Scan> tk_IntScanPair;
-typedef QList<tk_IntScanPair> tk_ScanWithChargeList;
+typedef QList<r_Scan> tk_ScanList;
 
 
 struct r_AmountEstimation
@@ -127,12 +127,17 @@ public:
     // estimate takes a list of spectra files and a hash of 
     // peptide => retention time and returns a list of scans which where just right
     // for the peptide
-    virtual tk_ScanWithChargeList estimate(QStringList ak_SpectraFiles, QString as_Peptide, double ad_RetentionTime);
+    virtual tk_ScanList estimate(QStringList ak_SpectraFiles, QString as_Peptide, double ad_RetentionTime);
     
 	virtual void handleScan(r_Scan& ar_Scan);
 	virtual void progressFunction(QString as_ScanId, bool ab_InterestingScan);
 	
 	virtual QString renderScanAsSvg(r_Scan& ar_Scan, r_ScanQuantitationResult ar_QuantitationResult);
+    QHash<QString, int> compositionForPeptide(const QString& as_Peptide);
+    double leastSquaresFit(QList<tk_DoublePair> ak_Pairs);
+    
+    // parallel mass matching, attention: both lists must be sorted!
+    QHash<int, int> matchTargetsToPeaks(QList<double> ak_PeakMz, QList<double> ak_TargetMz);
 	
 protected:
 	virtual double calculatePeptideMass(QString as_Peptide, int ai_Charge);
@@ -150,8 +155,6 @@ protected:
 	void fitGaussian(double* a_, double* b_, double* c_, double x0, double y0, 
 					 double x1, double y1, double x2, double y2);
 	double gaussian(double x, double a, double b, double c);
-    QHash<QString, int> compositionForPeptide(const QString& as_Peptide);
-    double leastSquaresFit(QList<tk_DoublePair> ak_Pairs);
     void parseLabel();
     QStringList tokenize(QString as_String);
     QString fetchNextToken(QStringList* ak_StringList_, QVariant::Type* ae_Type_);
@@ -202,5 +205,5 @@ protected:
     QHash<QString, k_IsotopeEnvelope> mk_HeavyIsotopeEnvelopeForAminoAcid;
     QHash<QString, tk_ArtificialEnvironment> mk_Label;
     bool mb_Estimate;
-    tk_ScanWithChargeList mk_ScanWithChargeList;
+    tk_ScanList mk_ScanList;
 };

@@ -24,6 +24,35 @@ along with SimQuant.  If not, see <http://www.gnu.org/licenses/>.
 #include <ptb/RefPtr.h>
 #include "version.h"
 
+#define HYDROGEN_MASS 1.0078250321
+
+struct r_EnvelopePeaks
+{
+    QSet<int> mk_RequiredIds;
+    QSet<int> mk_ConsideredIds;
+    QSet<int> mk_ForbiddenIds;
+};
+
+k_Quantifier* lk_Quantifier_;
+QString ls_Label = "15N";
+r_ScanType::Enumeration le_ScanType = r_ScanType::All;
+r_AmountEstimation::Enumeration le_AmountEstimation = r_AmountEstimation::Intensity;
+int li_MinCharge = 2;
+int li_MaxCharge = 3;
+double ld_MinSnr = 2.0;
+double ld_MassAccuracy = 5.0;
+double ld_RequireAbundance = 0.5;
+double ld_ConsiderAbundance = 0.05;
+double ld_MaxFitError = 0.01;
+bool lb_CheckForbiddenPeak = true;
+bool lb_PrintStatusMessages = true;
+bool lb_LogScale = true;
+
+QHash<QString, int> lk_Composition;
+QHash<int, tk_IsotopeEnvelope> lk_IsotopeEnvelopes;
+double ld_BaseMass;
+tk_IsotopeEnvelope lk_LightIsotopeEnvelope;
+
 
 void printUsageAndExit()
 {
@@ -73,6 +102,85 @@ bool stringToBool(QString& as_String)
 };
 
 
+double determineFitError(QList<r_Peak> ak_Peaks, int ai_Efficiency, int ai_Charge)
+{
+    double ld_Error = 0.0;
+    
+    // create target isotope envelope if it doesn't exist
+    if (!lk_IsotopeEnvelopes.contains(ai_Efficiency))
+    {
+        tk_ModifiedAbundances lk_Environment;
+        double ld_Efficiency = (double)ai_Efficiency / 10000.0;
+        lk_Environment["N"] = QList<double>() << (1.0 - ld_Efficiency) << ld_Efficiency;
+        k_IsotopeEnvelope lk_IsotopeEnvelope(lk_Environment);
+        tk_IsotopeEnvelope lk_Envelope = lk_IsotopeEnvelope.isotopeEnvelopeForComposition(lk_Composition);
+        lk_IsotopeEnvelopes[ai_Efficiency] = lk_Envelope;
+    }
+    
+    // create m/z targets
+    QList<double> lk_TargetMasses;
+    
+    r_EnvelopePeaks lr_LightPeptide;
+    r_EnvelopePeaks lr_HeavyPeptide;
+    
+    tk_IsotopeEnvelope& lk_Envelope = lk_LightIsotopeEnvelope;
+    tk_IsotopeEnvelope lk_NormalizedEnvelope = k_IsotopeEnvelope::normalize(lk_Envelope);
+
+    // add most prominent isotope envelope peaks (light peptide)
+    for (int i = 0; i < lk_Envelope.size(); ++i)
+    {
+        double ld_NormalizedAbundance = lk_NormalizedEnvelope[i].first;
+        if (ld_NormalizedAbundance > ld_ConsiderAbundance)
+        {
+            double ld_MassShift = lk_NormalizedEnvelope[i].second;
+            double ld_Mz = (ld_BaseMass + ld_MassShift + HYDROGEN_MASS * ai_Charge) / ai_Charge;
+            int li_Id = lk_TargetMasses.size();
+            lk_TargetMasses.append(ld_Mz);
+            if (ld_NormalizedAbundance > ld_RequireAbundance)
+                lr_LightPeptide.mk_RequiredIds.insert(li_Id);
+            else
+                lr_LightPeptide.mk_ConsideredIds.insert(li_Id);
+        }
+    }
+    
+    // add forbidden peak (light peptide)
+    double ld_Mz = (ld_BaseMass - HYDROGEN_MASS + HYDROGEN_MASS * ai_Charge) / ai_Charge;
+    int li_Id = lk_TargetMasses.size();
+    lk_TargetMasses.append(ld_Mz);
+    lr_LightPeptide.mk_ForbiddenIds.insert(li_Id);
+    
+    lk_Envelope = lk_IsotopeEnvelopes[ai_Efficiency];
+    lk_NormalizedEnvelope = k_IsotopeEnvelope::normalize(lk_Envelope);
+
+    // add most prominent isotope envelope peaks (heavy peptide)
+    for (int i = 0; i < lk_Envelope.size(); ++i)
+    {
+        double ld_NormalizedAbundance = lk_NormalizedEnvelope[i].first;
+        if (ld_NormalizedAbundance > ld_ConsiderAbundance)
+        {
+            double ld_MassShift = lk_NormalizedEnvelope[i].second;
+            double ld_Mz = (ld_BaseMass + ld_MassShift + HYDROGEN_MASS * ai_Charge) / ai_Charge;
+            int li_Id = lk_TargetMasses.size();
+            lk_TargetMasses.append(ld_Mz);
+            if (ld_NormalizedAbundance > ld_RequireAbundance)
+                lr_HeavyPeptide.mk_RequiredIds.insert(li_Id);
+            else
+                lr_HeavyPeptide.mk_ConsideredIds.insert(li_Id);
+        }
+    }
+    
+    // build peak m/z list
+    QList<double> lk_PeakMz;
+    foreach (r_Peak lr_Peak, ak_Peaks)
+        lk_PeakMz.append(lr_Peak.md_PeakMz);
+    QHash<int, int> lk_PeakForTarget = lk_Quantifier_->matchTargetsToPeaks(lk_PeakMz, lk_TargetMasses);
+    
+    printf("%9.4f\n", ld_BaseMass);
+    
+    return ld_Error;
+}
+
+
 int main(int ai_ArgumentCount, char** ac_Arguments__)
 {
 	QStringList lk_Arguments;
@@ -85,20 +193,6 @@ int main(int ai_ArgumentCount, char** ac_Arguments__)
 		exit(0);
 	}
 
-	QString ls_Label = "15N";
-	r_ScanType::Enumeration le_ScanType = r_ScanType::All;
-    r_AmountEstimation::Enumeration le_AmountEstimation = r_AmountEstimation::Intensity;
-	int li_MinCharge = 2;
-	int li_MaxCharge = 3;
-	double ld_MinSnr = 2.0;
-	double ld_MassAccuracy = 5.0;
-    double ld_RequireAbundance = 0.5;
-    double ld_ConsiderAbundance = 0.05;
-    double ld_MaxFitError = 0.01;
-	bool lb_CheckForbiddenPeak = true;
-	bool lb_PrintStatusMessages = true;
-    bool lb_LogScale = true;
-	
 	QFile lk_StdOut;
 	lk_StdOut.open(stdout, QIODevice::WriteOnly);
 	
@@ -259,7 +353,7 @@ int main(int ai_ArgumentCount, char** ac_Arguments__)
     double ld_RetentionTime;
     if (lk_Arguments.size() < 2)
     {
-        printf("Error: Peptide and retention time must be specified.\n");
+        printf("Error: A peptide and its retention time must be specified.\n");
         exit(1);
     }
     ls_Peptide = lk_Arguments.takeFirst();
@@ -274,24 +368,35 @@ int main(int ai_ArgumentCount, char** ac_Arguments__)
 	if (lk_SpectraFiles.empty())
 		printUsageAndExit();
 		
-    k_Quantifier 
-        lk_Quantifier(ls_Label, le_ScanType, le_AmountEstimation,
-                      QList<tk_IntPair>() << tk_IntPair(1, 1),
-                      li_MinCharge, li_MaxCharge, ld_MinSnr, 
-                      ld_MassAccuracy, ld_RequireAbundance, 
-                      ld_ConsiderAbundance, ld_MaxFitError, lk_CsvDevice_, 
-                      lk_XhtmlDevice_, lb_CheckForbiddenPeak, 
-                      lb_PrintStatusMessages, lb_LogScale);
+    lk_Quantifier_ = 
+        new k_Quantifier(ls_Label, le_ScanType, le_AmountEstimation,
+                     QList<tk_IntPair>() << tk_IntPair(1, 1),
+                     li_MinCharge, li_MaxCharge, ld_MinSnr, 
+                     ld_MassAccuracy, ld_RequireAbundance, 
+                     ld_ConsiderAbundance, ld_MaxFitError, lk_CsvDevice_, 
+                     lk_XhtmlDevice_, lb_CheckForbiddenPeak, 
+                     lb_PrintStatusMessages, lb_LogScale);
+                      
+    lk_Composition = lk_Quantifier_->compositionForPeptide(ls_Peptide);
+    k_IsotopeEnvelope lk_IsotopeEnvelope;
+    lk_LightIsotopeEnvelope = lk_IsotopeEnvelope.isotopeEnvelopeForComposition(lk_Composition);
+    ld_BaseMass = lk_IsotopeEnvelope.massForComposition(lk_Composition);
         
-	tk_ScanWithChargeList lk_ScanList = lk_Quantifier.estimate(lk_SpectraFiles, ls_Peptide, ld_RetentionTime);
-    QList<QList<r_Peak> > lk_PeaksForScan;
-    
+	tk_ScanList lk_ScanList = lk_Quantifier_->estimate(lk_SpectraFiles, ls_Peptide, ld_RetentionTime);
+
     // now check the scan list
-    foreach (tk_IntScanPair lk_IntScanPair, lk_ScanList)
+    foreach (r_Scan lr_Scan, lk_ScanList)
     {
-        int li_Charge = lk_IntScanPair.first;
-        r_Scan lr_Scan = lk_IntScanPair.second;
-        lk_PeaksForScan << k_ScanIterator::findAllPeaks(lr_Scan.mr_Spectrum);
-        printf("%d / %s (%d peaks)\n", li_Charge, lr_Scan.ms_Id.toStdString().c_str(), lk_PeaksForScan.last().size());
+        QList<r_Peak> lk_Peaks = k_ScanIterator::findAllPeaks(lr_Scan.mr_Spectrum);
+        for (int i = 9000; i <= 10000; i += 100)
+        {
+            for (int li_Charge = li_MinCharge; li_Charge <= li_MaxCharge; ++li_Charge)
+            {
+                double ld_Error = determineFitError(lk_Peaks, i, li_Charge);
+                printf("%4.2f (%d+) efficiency: %e\n", (double)i / 10000.0, li_Charge, ld_Error);
+            }
+        }
     }
+    
+    delete lk_Quantifier_;
 }

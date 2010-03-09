@@ -364,13 +364,13 @@ void k_Quantifier::quantify(QStringList ak_SpectraFiles, QStringList ak_Peptides
 }
 
 
-tk_ScanWithChargeList k_Quantifier::estimate(QStringList ak_SpectraFiles, QString as_Peptide, double ad_RetentionTime)
+tk_ScanList k_Quantifier::estimate(QStringList ak_SpectraFiles, QString as_Peptide, double ad_RetentionTime)
 {
     mb_Estimate = true;
     md_EstimateRetentionTime = ad_RetentionTime;
-    mk_ScanWithChargeList.clear();
+    mk_ScanList.clear();
     this->quantify(ak_SpectraFiles, QStringList() << as_Peptide, true);
-    return mk_ScanWithChargeList;
+    return mk_ScanList;
 }
 
 
@@ -379,85 +379,30 @@ void k_Quantifier::handleScan(r_Scan& ar_Scan)
 /*	if (QVariant(ar_Scan.ms_Id).toInt() != 5117)
 		return;*/
 
+    if (ar_Scan.mr_Spectrum.mi_PeaksCount == 0)
+    {
+        printf("Warning: Empty spectrum (scan #%s @ %1.2f minutes)!\n", ar_Scan.ms_Id.toStdString().c_str(), ar_Scan.md_RetentionTime);
+        return;
+    }
+    
     if (mb_Estimate)
     {
         double ld_Diff = fabs(ar_Scan.md_RetentionTime - md_EstimateRetentionTime);
         if (ld_Diff > 1.0)
             return;
+        mk_ScanList.append(ar_Scan);
+        return;
     }
     
-	if (ar_Scan.mr_Spectrum.mi_PeaksCount == 0)
-	{
-		printf("Warning: Empty spectrum (scan #%s @ %1.2f minutes)!\n", ar_Scan.ms_Id.toStdString().c_str(), ar_Scan.md_RetentionTime);
-		return;
-	}
-	
 	// find all peaks in this spectrum
 	QList<r_Peak> lk_AllPeaks = k_ScanIterator::findAllPeaks(ar_Scan.mr_Spectrum);
 // 	printf("all peaks: %d\n", lk_AllPeaks.size());
-	
-	// match all target m/z values simultaneously to this spectrum's peaks
-	// create root bucket
-	r_Bucket lr_RootBucket(0, lk_AllPeaks.size());
-	for (int i = 0; i < mk_AllTargetMasses.size(); ++i)
-		lr_RootBucket.mk_Entries.push_back(i);
-	
-	QList<r_Bucket> lk_Buckets;
-	lk_Buckets.push_back(lr_RootBucket);
-	
-	// after parallel searching, this list will contain for 
-	// each target m/z value the peak which is closest to it
- 	QHash<int, int> lk_PeakForTargetMz;
-	
-	// repeat until no more buckets are left to be processed
-	while (!lk_Buckets.empty())
-	{
-		// put all target m/z values into the appropriate bucket
-		QList<r_Bucket> lk_NewBuckets;
-		foreach (r_Bucket lr_Bucket, lk_Buckets)
-		{
-			if (lr_Bucket.mi_Length <= 1)
-			{
-				for (int i = 0; i < lr_Bucket.mk_Entries.size(); ++i)
-				{
-					/*
-					printf("%1.6f is close to %1.6f\n", 
-						mk_AllTargetMasses[lr_Bucket.mk_Entries[i]],
-						ar_Scan.mr_Spectrum.md_MzValues_[lr_Bucket.mi_Start]);
-					*/
-					lk_PeakForTargetMz[lr_Bucket.mk_Entries[i]] = lr_Bucket.mi_Start;
-				}
-			}
-			else
-			{
-				// split this bucket and create left and right children
-				int li_HalfSize = lr_Bucket.mi_Length / 2;
-				r_Bucket lr_LeftChild(lr_Bucket.mi_Start, li_HalfSize);
-				r_Bucket lr_RightChild(lr_Bucket.mi_Start + li_HalfSize, lr_Bucket.mi_Length - li_HalfSize);
-				double ld_LeftBorder = lk_AllPeaks[lr_RightChild.mi_Start - 1].md_PeakMz;
-				double ld_RightBorder = lk_AllPeaks[lr_RightChild.mi_Start].md_PeakMz;
-				double ld_Razor = (ld_LeftBorder + ld_RightBorder) * 0.5;
-				
-				// now determine which target m/z entries go into the 
-				// left child and which go into the right child
-				
-				// TODO: this could be sped up because everything is sorted
-				for (int i = 0; i < lr_Bucket.mk_Entries.size(); ++i)
-				{
-					if (mk_AllTargetMasses[lr_Bucket.mk_Entries[i]] > ld_Razor)
-						lr_RightChild.mk_Entries.push_back(lr_Bucket.mk_Entries[i]);
-					else
-						lr_LeftChild.mk_Entries.push_back(lr_Bucket.mk_Entries[i]);
-				}
-				
-				if (!lr_LeftChild.mk_Entries.empty())
-					lk_NewBuckets.push_back(lr_LeftChild);
-				if (!lr_RightChild.mk_Entries.empty())
-					lk_NewBuckets.push_back(lr_RightChild);
-			}
-		}
-		lk_Buckets = lk_NewBuckets;
-	}
+
+    QList<double> lk_AllPeaksMz;
+    foreach (r_Peak lr_Peak, lk_AllPeaks)
+        lk_AllPeaksMz << lr_Peak.md_PeakMz;
+    
+    QHash<int, int> lk_PeakForTargetMz = matchTargetsToPeaks(lk_AllPeaksMz, mk_AllTargetMasses);
 	
 /*	foreach (QString s, mk_TargetMzIndex.keys())
 	{
@@ -652,47 +597,42 @@ void k_Quantifier::handleScan(r_Scan& ar_Scan)
                 
                 if (lb_GoodQE)
                 {
-                    if (mb_Estimate)
-                        mk_ScanWithChargeList.append(QPair<int, r_Scan>(li_Charge, ar_Scan));
-                    else
+                    if (mk_CsvOutStream.device())
                     {
-                        if (mk_CsvOutStream.device())
-                        {
-                            mk_CsvOutStream << "\"" << ms_CurrentSpot << "\""
-                                << ",\"" << ar_Scan.ms_Id << "\""
-                                << ",\"" << ls_Peptide << "\""
-                                << "," << lr_ScanResult.md_AmountUnlabeled
-                                << "," << lr_ScanResult.md_AmountLabeled
-                                << "," << ar_Scan.md_RetentionTime
-                                << "," << lr_ScanResult.mi_Charge
-                                << ",\"" << ar_Scan.ms_FilterLine << "\""
-                                << "," << lr_ScanResult.md_Snr
-                                << endl;
-                        }
-                 
-                        if (mk_XhtmlOutStream.device())
-                        {
-                            mk_XhtmlOutStream << QString("\n<!-- BEGIN PEPTIDE %1 -->\n").arg(ls_Peptide); 
-                            mk_XhtmlOutStream << "<tr>"
-                                << "<td>" << ms_CurrentSpot << "</td>"
-                                << "<td>" << ar_Scan.ms_Id << "</td>"
-                                << "<td>" << ls_Peptide << "</td>"
-                                << "<td>" << lr_ScanResult.md_AmountUnlabeled << "</td>"
-                                << "<td>" << lr_ScanResult.md_AmountLabeled << "</td>"
-                                << "<td>" << ar_Scan.md_RetentionTime << "</td>"
-                                << "<td>" << lr_ScanResult.mi_Charge << "</td>"
-                                << "<td>" << ar_Scan.ms_FilterLine << "</td>"
-                                << "<td>" << lr_ScanResult.md_Snr << "</td>"
-                                << "</tr>"
-                                << endl;
-                            QString ls_Svg = this->renderScanAsSvg(ar_Scan, lr_ScanResult);
-                            ls_Svg.remove(QRegExp("<\\?xml.+\\?>"));
-                            ls_Svg.replace(QRegExp("width=\\\"[^\\\"]*\\\"\\s+height=\\\"[^\\\"]*\\\""), "width='950' height='238'");
-                            mk_XhtmlOutStream << "<div style='background-color: #fff;' width='950' height='238'>";
-                            mk_XhtmlOutStream << ls_Svg;
-                            mk_XhtmlOutStream << "</div>" << endl;
-                            mk_XhtmlOutStream << QString("\n<!-- END PEPTIDE %1 -->\n").arg(ls_Peptide); 
-                        }
+                        mk_CsvOutStream << "\"" << ms_CurrentSpot << "\""
+                            << ",\"" << ar_Scan.ms_Id << "\""
+                            << ",\"" << ls_Peptide << "\""
+                            << "," << lr_ScanResult.md_AmountUnlabeled
+                            << "," << lr_ScanResult.md_AmountLabeled
+                            << "," << ar_Scan.md_RetentionTime
+                            << "," << lr_ScanResult.mi_Charge
+                            << ",\"" << ar_Scan.ms_FilterLine << "\""
+                            << "," << lr_ScanResult.md_Snr
+                            << endl;
+                    }
+                
+                    if (mk_XhtmlOutStream.device())
+                    {
+                        mk_XhtmlOutStream << QString("\n<!-- BEGIN PEPTIDE %1 -->\n").arg(ls_Peptide); 
+                        mk_XhtmlOutStream << "<tr>"
+                            << "<td>" << ms_CurrentSpot << "</td>"
+                            << "<td>" << ar_Scan.ms_Id << "</td>"
+                            << "<td>" << ls_Peptide << "</td>"
+                            << "<td>" << lr_ScanResult.md_AmountUnlabeled << "</td>"
+                            << "<td>" << lr_ScanResult.md_AmountLabeled << "</td>"
+                            << "<td>" << ar_Scan.md_RetentionTime << "</td>"
+                            << "<td>" << lr_ScanResult.mi_Charge << "</td>"
+                            << "<td>" << ar_Scan.ms_FilterLine << "</td>"
+                            << "<td>" << lr_ScanResult.md_Snr << "</td>"
+                            << "</tr>"
+                            << endl;
+                        QString ls_Svg = this->renderScanAsSvg(ar_Scan, lr_ScanResult);
+                        ls_Svg.remove(QRegExp("<\\?xml.+\\?>"));
+                        ls_Svg.replace(QRegExp("width=\\\"[^\\\"]*\\\"\\s+height=\\\"[^\\\"]*\\\""), "width='950' height='238'");
+                        mk_XhtmlOutStream << "<div style='background-color: #fff;' width='950' height='238'>";
+                        mk_XhtmlOutStream << ls_Svg;
+                        mk_XhtmlOutStream << "</div>" << endl;
+                        mk_XhtmlOutStream << QString("\n<!-- END PEPTIDE %1 -->\n").arg(ls_Peptide); 
                     }
                 }
             }
@@ -1208,6 +1148,74 @@ double k_Quantifier::leastSquaresFit(QList<tk_DoublePair> ak_Pairs)
     }
     f /= e;
     return f;
+}
+
+
+QHash<int, int> k_Quantifier::matchTargetsToPeaks(QList<double> ak_PeakMz, QList<double> ak_TargetMz)
+{
+    // match all target m/z values simultaneously to this spectrum's peaks
+    // create root bucket
+    r_Bucket lr_RootBucket(0, ak_PeakMz.size());
+    for (int i = 0; i < ak_TargetMz.size(); ++i)
+        lr_RootBucket.mk_Entries.push_back(i);
+    
+    QList<r_Bucket> lk_Buckets;
+    lk_Buckets.push_back(lr_RootBucket);
+    
+    // after parallel searching, this list will contain for 
+    // each target m/z value the peak which is closest to it
+    QHash<int, int> lk_PeakForTargetMz;
+    
+    // repeat until no more buckets are left to be processed
+    while (!lk_Buckets.empty())
+    {
+        // put all target m/z values into the appropriate bucket
+        QList<r_Bucket> lk_NewBuckets;
+        foreach (r_Bucket lr_Bucket, lk_Buckets)
+        {
+            if (lr_Bucket.mi_Length <= 1)
+            {
+                for (int i = 0; i < lr_Bucket.mk_Entries.size(); ++i)
+                {
+                    /*
+                    printf("%1.6f is close to %1.6f\n", 
+                        mk_AllTargetMasses[lr_Bucket.mk_Entries[i]],
+                        ar_Scan.mr_Spectrum.md_MzValues_[lr_Bucket.mi_Start]);
+                    */
+                    lk_PeakForTargetMz[lr_Bucket.mk_Entries[i]] = lr_Bucket.mi_Start;
+                }
+            }
+            else
+            {
+                // split this bucket and create left and right children
+                int li_HalfSize = lr_Bucket.mi_Length / 2;
+                r_Bucket lr_LeftChild(lr_Bucket.mi_Start, li_HalfSize);
+                r_Bucket lr_RightChild(lr_Bucket.mi_Start + li_HalfSize, lr_Bucket.mi_Length - li_HalfSize);
+                double ld_LeftBorder = ak_PeakMz[lr_RightChild.mi_Start - 1];
+                double ld_RightBorder = ak_PeakMz[lr_RightChild.mi_Start];
+                double ld_Razor = (ld_LeftBorder + ld_RightBorder) * 0.5;
+                
+                // now determine which target m/z entries go into the 
+                // left child and which go into the right child
+                
+                // TODO: this could be sped up because everything is sorted
+                for (int i = 0; i < lr_Bucket.mk_Entries.size(); ++i)
+                {
+                    if (ak_TargetMz[lr_Bucket.mk_Entries[i]] > ld_Razor)
+                        lr_RightChild.mk_Entries.push_back(lr_Bucket.mk_Entries[i]);
+                    else
+                        lr_LeftChild.mk_Entries.push_back(lr_Bucket.mk_Entries[i]);
+                }
+                
+                if (!lr_LeftChild.mk_Entries.empty())
+                    lk_NewBuckets.push_back(lr_LeftChild);
+                if (!lr_RightChild.mk_Entries.empty())
+                    lk_NewBuckets.push_back(lr_RightChild);
+            }
+        }
+        lk_Buckets = lk_NewBuckets;
+    }    
+    return lk_PeakForTargetMz;
 }
 
 
