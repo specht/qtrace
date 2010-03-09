@@ -126,6 +126,7 @@ double determineFitError(QList<r_Peak> ak_Peaks, int ai_Efficiency, int ai_Charg
     
     QMultiMap<double, int> lk_TargetMasses;
     QHash<int, double> lk_IntensityForId;
+    QHash<int, double> lk_NormalizedIntensityForId;
     
     int li_Id = 0;
 
@@ -140,6 +141,7 @@ double determineFitError(QList<r_Peak> ak_Peaks, int ai_Efficiency, int ai_Charg
             ++li_Id;
             lk_TargetMasses.insert(ld_Mz, li_Id);
             lk_IntensityForId[li_Id] = lk_Envelope[i].first;
+            lk_NormalizedIntensityForId[li_Id] = lk_NormalizedEnvelope[i].first;
             if (ld_NormalizedAbundance >= ld_RequireAbundance)
                 lr_LightPeptide.mk_RequiredIds.insert(li_Id);
             else
@@ -167,6 +169,7 @@ double determineFitError(QList<r_Peak> ak_Peaks, int ai_Efficiency, int ai_Charg
             ++li_Id;
             lk_TargetMasses.insert(ld_Mz, li_Id);
             lk_IntensityForId[li_Id] = lk_Envelope[i].first;
+            lk_NormalizedIntensityForId[li_Id] = lk_NormalizedEnvelope[i].first;
             if (ld_NormalizedAbundance >= ld_RequireAbundance)
                 lr_HeavyPeptide.mk_RequiredIds.insert(li_Id);
             else
@@ -216,17 +219,23 @@ double determineFitError(QList<r_Peak> ak_Peaks, int ai_Efficiency, int ai_Charg
             // now do a least squares fit of the observed peaks to the calculated isotope envelope
             QList<tk_DoublePair> lk_Pairs;
             foreach (int li_Id, lr_HeavyPeptide.mk_RequiredIds)
-                lk_Pairs << tk_DoublePair(lk_IntensityForId[li_Id], ak_Peaks[lk_MatchedHeavyRequiredPeaks[li_Id]].md_PeakIntensity);
+            {
+                double f = pow(lk_NormalizedIntensityForId[li_Id], 0.5);
+                lk_Pairs << tk_DoublePair(lk_IntensityForId[li_Id] * f, ak_Peaks[lk_MatchedHeavyRequiredPeaks[li_Id]].md_PeakIntensity * f);
+            }
             foreach (int li_Id, lr_HeavyPeptide.mk_ConsideredIds)
             {
                 if (lk_MatchedHeavyConsideredPeaks.contains(li_Id))
-                    lk_Pairs << tk_DoublePair(lk_IntensityForId[li_Id], ak_Peaks[lk_MatchedHeavyConsideredPeaks[li_Id]].md_PeakIntensity);
+                {
+                    double f = pow(lk_NormalizedIntensityForId[li_Id], 0.5);
+                    lk_Pairs << tk_DoublePair(lk_IntensityForId[li_Id] * f, ak_Peaks[lk_MatchedHeavyConsideredPeaks[li_Id]].md_PeakIntensity * f);
+                }
             }
-/*            for (int i = 0; i < lk_Pairs.size(); ++i)
+            for (int i = 0; i < lk_Pairs.size(); ++i)
             {
-                lk_Pairs[i].first = lk_Pairs[i].first * lk_Pairs[i].first;
-                lk_Pairs[i].second = lk_Pairs[i].second * lk_Pairs[i].second;
-            }*/
+                lk_Pairs[i].first *= lk_Pairs[i].first * lk_Pairs[i].first;
+                lk_Pairs[i].second *= lk_Pairs[i].second * lk_Pairs[i].second;
+            }
             double ld_Factor = lk_Quantifier_->leastSquaresFit(lk_Pairs);
             ld_Error = 0.0;
             foreach (tk_DoublePair lk_Pair, lk_Pairs)
@@ -467,7 +476,7 @@ int main(int ai_ArgumentCount, char** ac_Arguments__)
                     }
                 }
 //                 printf("%6.2f%% (%d+) efficiency: %e\n", (double)i / 100.0, li_Charge, ld_Error);
-//                 printf("%f,%f\n", (double)i / 10000.0, ld_Error);
+//                  printf("%f,%f\n", (double)i / 10000.0, ld_Error);
             }
             printf("(%d+): %1.2f%%\n", li_Charge, (double)li_MinEfficiency / 100.0);
         }
