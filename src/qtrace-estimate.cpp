@@ -102,9 +102,10 @@ bool stringToBool(QString& as_String)
 };
 
 
+// returns fit error or a negative value on 'no can do!'
 double determineFitError(QList<r_Peak> ak_Peaks, int ai_Efficiency, int ai_Charge)
 {
-    double ld_Error = 0.0;
+    double ld_Error = -1.0;
     
     // create target isotope envelope if it doesn't exist
     if (!lk_IsotopeEnvelopes.contains(ai_Efficiency))
@@ -117,26 +118,29 @@ double determineFitError(QList<r_Peak> ak_Peaks, int ai_Efficiency, int ai_Charg
         lk_IsotopeEnvelopes[ai_Efficiency] = lk_Envelope;
     }
     
-    // create m/z targets
-    QList<double> lk_TargetMasses;
-    
     r_EnvelopePeaks lr_LightPeptide;
     r_EnvelopePeaks lr_HeavyPeptide;
     
     tk_IsotopeEnvelope& lk_Envelope = lk_LightIsotopeEnvelope;
     tk_IsotopeEnvelope lk_NormalizedEnvelope = k_IsotopeEnvelope::normalize(lk_Envelope);
+    
+    QMultiMap<double, int> lk_TargetMasses;
+    QHash<int, double> lk_IntensityForId;
+    
+    int li_Id = 0;
 
     // add most prominent isotope envelope peaks (light peptide)
     for (int i = 0; i < lk_Envelope.size(); ++i)
     {
         double ld_NormalizedAbundance = lk_NormalizedEnvelope[i].first;
-        if (ld_NormalizedAbundance > ld_ConsiderAbundance)
+        if (ld_NormalizedAbundance >= ld_ConsiderAbundance)
         {
             double ld_MassShift = lk_NormalizedEnvelope[i].second;
             double ld_Mz = (ld_BaseMass + ld_MassShift + HYDROGEN_MASS * ai_Charge) / ai_Charge;
-            int li_Id = lk_TargetMasses.size();
-            lk_TargetMasses.append(ld_Mz);
-            if (ld_NormalizedAbundance > ld_RequireAbundance)
+            ++li_Id;
+            lk_TargetMasses.insert(ld_Mz, li_Id);
+            lk_IntensityForId[li_Id] = lk_Envelope[i].first;
+            if (ld_NormalizedAbundance >= ld_RequireAbundance)
                 lr_LightPeptide.mk_RequiredIds.insert(li_Id);
             else
                 lr_LightPeptide.mk_ConsideredIds.insert(li_Id);
@@ -145,8 +149,8 @@ double determineFitError(QList<r_Peak> ak_Peaks, int ai_Efficiency, int ai_Charg
     
     // add forbidden peak (light peptide)
     double ld_Mz = (ld_BaseMass - HYDROGEN_MASS + HYDROGEN_MASS * ai_Charge) / ai_Charge;
-    int li_Id = lk_TargetMasses.size();
-    lk_TargetMasses.append(ld_Mz);
+    ++li_Id;
+    lk_TargetMasses.insert(ld_Mz, li_Id);
     lr_LightPeptide.mk_ForbiddenIds.insert(li_Id);
     
     lk_Envelope = lk_IsotopeEnvelopes[ai_Efficiency];
@@ -156,13 +160,14 @@ double determineFitError(QList<r_Peak> ak_Peaks, int ai_Efficiency, int ai_Charg
     for (int i = 0; i < lk_Envelope.size(); ++i)
     {
         double ld_NormalizedAbundance = lk_NormalizedEnvelope[i].first;
-        if (ld_NormalizedAbundance > ld_ConsiderAbundance)
+        if (ld_NormalizedAbundance >= ld_ConsiderAbundance)
         {
             double ld_MassShift = lk_NormalizedEnvelope[i].second;
             double ld_Mz = (ld_BaseMass + ld_MassShift + HYDROGEN_MASS * ai_Charge) / ai_Charge;
-            int li_Id = lk_TargetMasses.size();
-            lk_TargetMasses.append(ld_Mz);
-            if (ld_NormalizedAbundance > ld_RequireAbundance)
+            ++li_Id;
+            lk_TargetMasses.insert(ld_Mz, li_Id);
+            lk_IntensityForId[li_Id] = lk_Envelope[i].first;
+            if (ld_NormalizedAbundance >= ld_RequireAbundance)
                 lr_HeavyPeptide.mk_RequiredIds.insert(li_Id);
             else
                 lr_HeavyPeptide.mk_ConsideredIds.insert(li_Id);
@@ -173,9 +178,67 @@ double determineFitError(QList<r_Peak> ak_Peaks, int ai_Efficiency, int ai_Charg
     QList<double> lk_PeakMz;
     foreach (r_Peak lr_Peak, ak_Peaks)
         lk_PeakMz.append(lr_Peak.md_PeakMz);
-    QHash<int, int> lk_PeakForTarget = lk_Quantifier_->matchTargetsToPeaks(lk_PeakMz, lk_TargetMasses);
+    QList<double> lk_TargetMzSorted = lk_TargetMasses.keys();
+    QList<int> lk_TargetMzIdSorted = lk_TargetMasses.values();
+    QHash<int, int> lk_PeakForTarget = lk_Quantifier_->matchTargetsToPeaks(lk_PeakMz, lk_TargetMzSorted, ld_MassAccuracy);
     
-    printf("%9.4f\n", ld_BaseMass);
+    QHash<int, int> lk_MatchedLightRequiredPeaks = lk_Quantifier_->extractMatches(lr_LightPeptide.mk_RequiredIds, lk_TargetMzIdSorted, lk_PeakForTarget);
+    QHash<int, int> lk_MatchedLightConsideredPeaks = lk_Quantifier_->extractMatches(lr_LightPeptide.mk_ConsideredIds, lk_TargetMzIdSorted, lk_PeakForTarget);
+    QHash<int, int> lk_MatchedLightForbiddenPeaks = lk_Quantifier_->extractMatches(lr_LightPeptide.mk_ForbiddenIds, lk_TargetMzIdSorted, lk_PeakForTarget);
+    QHash<int, int> lk_MatchedHeavyRequiredPeaks = lk_Quantifier_->extractMatches(lr_HeavyPeptide.mk_RequiredIds, lk_TargetMzIdSorted, lk_PeakForTarget);
+    QHash<int, int> lk_MatchedHeavyConsideredPeaks = lk_Quantifier_->extractMatches(lr_HeavyPeptide.mk_ConsideredIds, lk_TargetMzIdSorted, lk_PeakForTarget);
+    
+    /*
+    printf("Matched %d of %d peaks (L %d/%d %d/%d F %d/1 H %d/%d %d/%d).\n", 
+           lk_PeakForTarget.size(), lk_TargetMzSorted.size(),
+           lk_MatchedLightRequiredPeaks.size(),
+           lr_LightPeptide.mk_RequiredIds.size(),
+           lk_MatchedLightConsideredPeaks.size(),
+           lr_LightPeptide.mk_ConsideredIds.size(),
+           lk_MatchedLightForbiddenPeaks.size(),
+           lk_MatchedHeavyRequiredPeaks.size(),
+           lr_HeavyPeptide.mk_RequiredIds.size(),
+           lk_MatchedHeavyConsideredPeaks.size(),
+           lr_HeavyPeptide.mk_ConsideredIds.size());
+           */
+
+    if (lb_CheckForbiddenPeak)
+    {
+        if (!lk_MatchedLightForbiddenPeaks.empty())
+            return -1.0;
+    }
+    
+    if (lk_MatchedLightRequiredPeaks.size() == lr_LightPeptide.mk_RequiredIds.size())
+    {
+        if (lk_MatchedHeavyRequiredPeaks.size() == lr_HeavyPeptide.mk_RequiredIds.size())
+        {
+            // all required light and heavy peaks are there, this must be the peptide!
+            // now do a least squares fit of the observed peaks to the calculated isotope envelope
+            QList<tk_DoublePair> lk_Pairs;
+            foreach (int li_Id, lr_HeavyPeptide.mk_RequiredIds)
+                lk_Pairs << tk_DoublePair(lk_IntensityForId[li_Id], ak_Peaks[lk_MatchedHeavyRequiredPeaks[li_Id]].md_PeakIntensity);
+            foreach (int li_Id, lr_HeavyPeptide.mk_ConsideredIds)
+            {
+                if (lk_MatchedHeavyConsideredPeaks.contains(li_Id))
+                    lk_Pairs << tk_DoublePair(lk_IntensityForId[li_Id], ak_Peaks[lk_MatchedHeavyConsideredPeaks[li_Id]].md_PeakIntensity);
+            }
+/*            for (int i = 0; i < lk_Pairs.size(); ++i)
+            {
+                lk_Pairs[i].first = lk_Pairs[i].first * lk_Pairs[i].first;
+                lk_Pairs[i].second = lk_Pairs[i].second * lk_Pairs[i].second;
+            }*/
+            double ld_Factor = lk_Quantifier_->leastSquaresFit(lk_Pairs);
+            ld_Error = 0.0;
+            foreach (tk_DoublePair lk_Pair, lk_Pairs)
+            {
+                double ld_TargetHeight = lk_Pair.first;
+                double ld_PeakHeight = lk_Pair.second;
+                ld_PeakHeight /= ld_Factor;
+                ld_Error += pow(ld_PeakHeight - ld_TargetHeight, 2.0);
+            }
+            ld_Error /= lk_Pairs.size();
+        }
+    }
     
     return ld_Error;
 }
@@ -388,13 +451,25 @@ int main(int ai_ArgumentCount, char** ac_Arguments__)
     foreach (r_Scan lr_Scan, lk_ScanList)
     {
         QList<r_Peak> lk_Peaks = k_ScanIterator::findAllPeaks(lr_Scan.mr_Spectrum);
-        for (int i = 9000; i <= 10000; i += 100)
+        for (int li_Charge = li_MinCharge; li_Charge <= li_MaxCharge; ++li_Charge)
         {
-            for (int li_Charge = li_MinCharge; li_Charge <= li_MaxCharge; ++li_Charge)
+            double ld_MinError = -1.0;
+            int li_MinEfficiency = 0;
+            for (int i = 9500; i <= 10000; i += 1)
             {
                 double ld_Error = determineFitError(lk_Peaks, i, li_Charge);
-                printf("%4.2f (%d+) efficiency: %e\n", (double)i / 10000.0, li_Charge, ld_Error);
+                if (ld_Error >= 0.0)
+                {
+                    if (ld_MinError < 0.0 || ld_Error < ld_MinError)
+                    {
+                        ld_MinError = ld_Error;
+                        li_MinEfficiency = i;
+                    }
+                }
+//                 printf("%6.2f%% (%d+) efficiency: %e\n", (double)i / 100.0, li_Charge, ld_Error);
+//                 printf("%f,%f\n", (double)i / 10000.0, ld_Error);
             }
+            printf("(%d+): %1.2f%%\n", li_Charge, (double)li_MinEfficiency / 100.0);
         }
     }
     

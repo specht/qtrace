@@ -402,7 +402,7 @@ void k_Quantifier::handleScan(r_Scan& ar_Scan)
     foreach (r_Peak lr_Peak, lk_AllPeaks)
         lk_AllPeaksMz << lr_Peak.md_PeakMz;
     
-    QHash<int, int> lk_PeakForTargetMz = matchTargetsToPeaks(lk_AllPeaksMz, mk_AllTargetMasses);
+    QHash<int, int> lk_PeakForTargetMz = matchTargetsToPeaks(lk_AllPeaksMz, mk_AllTargetMasses, md_MassAccuracy);
 	
 /*	foreach (QString s, mk_TargetMzIndex.keys())
 	{
@@ -1151,7 +1151,7 @@ double k_Quantifier::leastSquaresFit(QList<tk_DoublePair> ak_Pairs)
 }
 
 
-QHash<int, int> k_Quantifier::matchTargetsToPeaks(QList<double> ak_PeakMz, QList<double> ak_TargetMz)
+QHash<int, int> k_Quantifier::matchTargetsToPeaks(QList<double> ak_PeakMz, QList<double> ak_TargetMz, double ad_MassAccuracy)
 {
     // match all target m/z values simultaneously to this spectrum's peaks
     // create root bucket
@@ -1166,6 +1166,19 @@ QHash<int, int> k_Quantifier::matchTargetsToPeaks(QList<double> ak_PeakMz, QList
     // each target m/z value the peak which is closest to it
     QHash<int, int> lk_PeakForTargetMz;
     
+    // the parallel search works as follows:
+    // 1. a bucket describes a peak range and contains a set of targets
+    // 2. start with a root bucket that spans all peaks and contains all targets
+    // 3. split the bucket into two children (sound familiar, Quake hackers?),
+    //    find the cut position within the targets, sort each half into the 
+    //    appropriate child bucket
+    // 4. if a bucket spans a single peak only, assing all targets in this bucket
+    //    if they are within the specified mass accuracy and if the two adjacent peaks
+    //    are sufficiently far away (i. e. are not within mass accuracy distance)
+    // 5. voila, we end up with many target masses matched to many peak masses,
+    //    and every assignment is confident within the specified mass accuracy
+    //    (there are no ambiguities)
+    
     // repeat until no more buckets are left to be processed
     while (!lk_Buckets.empty())
     {
@@ -1177,12 +1190,31 @@ QHash<int, int> k_Quantifier::matchTargetsToPeaks(QList<double> ak_PeakMz, QList
             {
                 for (int i = 0; i < lr_Bucket.mk_Entries.size(); ++i)
                 {
-                    /*
-                    printf("%1.6f is close to %1.6f\n", 
-                        mk_AllTargetMasses[lr_Bucket.mk_Entries[i]],
-                        ar_Scan.mr_Spectrum.md_MzValues_[lr_Bucket.mi_Start]);
-                    */
-                    lk_PeakForTargetMz[lr_Bucket.mk_Entries[i]] = lr_Bucket.mi_Start;
+                    int li_PeakIndex = lr_Bucket.mi_Start;
+                    double ld_TargetMass = ak_TargetMz[lr_Bucket.mk_Entries[i]];
+                    double ld_PeakMass = ak_PeakMz[li_PeakIndex];
+                    double ld_MassError = fabs(ld_PeakMass - ld_TargetMass) / ld_TargetMass * 1000000.0;
+                    if (ld_MassError <= ad_MassAccuracy)
+                    {
+                        // the match is good, now check the adjacent peaks, if any
+                        bool lb_Good = true;
+                        if (li_PeakIndex > 0)
+                        {
+                            double ld_OtherPeakMass = ak_PeakMz[li_PeakIndex - 1];
+                            double ld_OtherMassError = fabs(ld_OtherPeakMass - ld_TargetMass) / ld_TargetMass * 1000000.0;
+                            if (ld_OtherMassError <= ad_MassAccuracy)
+                                lb_Good = false;
+                        }
+                        if (li_PeakIndex < ak_PeakMz.size() - 1)
+                        {
+                            double ld_OtherPeakMass = ak_PeakMz[li_PeakIndex + 1];
+                            double ld_OtherMassError = fabs(ld_OtherPeakMass - ld_TargetMass) / ld_TargetMass * 1000000.0;
+                            if (ld_OtherMassError <= ad_MassAccuracy)
+                                lb_Good = false;
+                        }
+                        if (lb_Good)
+                            lk_PeakForTargetMz[lr_Bucket.mk_Entries[i]] = li_PeakIndex;
+                    }
                 }
             }
             else
@@ -1216,6 +1248,22 @@ QHash<int, int> k_Quantifier::matchTargetsToPeaks(QList<double> ak_PeakMz, QList
         lk_Buckets = lk_NewBuckets;
     }    
     return lk_PeakForTargetMz;
+}
+
+
+QHash<int, int> k_Quantifier::extractMatches(QSet<int> ak_Ids, QList<int> ak_TargetIdsSorted, QHash<int, int> ak_Matches)
+{
+    QHash<int, int> lk_Result;
+    
+    // ak_Matches contains a peak id for a target id
+    foreach (int li_Id, ak_Matches.keys())
+    {
+        int li_TranslatedId = ak_TargetIdsSorted[li_Id];
+        if (ak_Ids.contains(li_TranslatedId))
+            lk_Result[li_TranslatedId] = ak_Matches[li_Id];
+    }
+    
+    return lk_Result;
 }
 
 

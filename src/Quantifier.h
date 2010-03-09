@@ -137,7 +137,8 @@ public:
     double leastSquaresFit(QList<tk_DoublePair> ak_Pairs);
     
     // parallel mass matching, attention: both lists must be sorted!
-    QHash<int, int> matchTargetsToPeaks(QList<double> ak_PeakMz, QList<double> ak_TargetMz);
+    QHash<int, int> matchTargetsToPeaks(QList<double> ak_PeakMz, QList<double> ak_TargetMz, double ad_MassAccuracy);
+    QHash<int, int> extractMatches(QSet<int> ak_Ids, QList<int> ak_TargetIdsSorted, QHash<int, int> ak_Matches);
 	
 protected:
 	virtual double calculatePeptideMass(QString as_Peptide, int ai_Charge);
