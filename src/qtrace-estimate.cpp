@@ -218,33 +218,55 @@ double determineFitError(QList<r_Peak> ak_Peaks, int ai_Efficiency, int ai_Charg
             // all required light and heavy peaks are there, this must be the peptide!
             // now do a least squares fit of the observed peaks to the calculated isotope envelope
             QList<tk_DoublePair> lk_Pairs;
+            // lk_PairFactor contains a factor from 0 to 1 which denotes the weight of the pair
+            // (smaller target peaks are not so important, after all!)
+            QList<double> lk_PairFactor;
+            double ld_PairFactorSum = 0.0;
             foreach (int li_Id, lr_HeavyPeptide.mk_RequiredIds)
             {
-                double f = pow(lk_NormalizedIntensityForId[li_Id], 0.5);
-                lk_Pairs << tk_DoublePair(lk_IntensityForId[li_Id] * f, ak_Peaks[lk_MatchedHeavyRequiredPeaks[li_Id]].md_PeakIntensity * f);
+                 double f = pow(lk_NormalizedIntensityForId[li_Id], 0.5);
+//                 double f = 1.0;
+                lk_PairFactor << f;
+                ld_PairFactorSum += f;
+                lk_Pairs << tk_DoublePair(lk_IntensityForId[li_Id], ak_Peaks[lk_MatchedHeavyRequiredPeaks[li_Id]].md_PeakIntensity);
             }
             foreach (int li_Id, lr_HeavyPeptide.mk_ConsideredIds)
             {
                 if (lk_MatchedHeavyConsideredPeaks.contains(li_Id))
                 {
                     double f = pow(lk_NormalizedIntensityForId[li_Id], 0.5);
-                    lk_Pairs << tk_DoublePair(lk_IntensityForId[li_Id] * f, ak_Peaks[lk_MatchedHeavyConsideredPeaks[li_Id]].md_PeakIntensity * f);
+//                     double f = 1.0;
+                    lk_PairFactor << f;
+                    ld_PairFactorSum += f;
+                    lk_Pairs << tk_DoublePair(lk_IntensityForId[li_Id], ak_Peaks[lk_MatchedHeavyConsideredPeaks[li_Id]].md_PeakIntensity);
                 }
             }
+            
+            double ld_MaxTargetIntensity = 0.0;
+            foreach (tk_DoublePair lk_Pair, lk_Pairs)
+                ld_MaxTargetIntensity = std::max<double>(ld_MaxTargetIntensity, lk_Pair.first);
+            
+//             printf("max target intensity: %1.2f\n", ld_MaxTargetIntensity);
+
+            double ld_Factor = lk_Quantifier_->leastSquaresFit(lk_Pairs);
+//             printf("factor: %1.2f\n", ld_Factor);
+            ld_Error = 0.0;
+            // the error is the sum of squared differences (where the target set is normalized to max. intensity 1)
+
             for (int i = 0; i < lk_Pairs.size(); ++i)
             {
-                lk_Pairs[i].first *= lk_Pairs[i].first * lk_Pairs[i].first;
-                lk_Pairs[i].second *= lk_Pairs[i].second * lk_Pairs[i].second;
-            }
-            double ld_Factor = lk_Quantifier_->leastSquaresFit(lk_Pairs);
-            ld_Error = 0.0;
-            foreach (tk_DoublePair lk_Pair, lk_Pairs)
-            {
+                tk_DoublePair lk_Pair = lk_Pairs[i];
+                double ld_PairFactor = lk_PairFactor[i];
                 double ld_TargetHeight = lk_Pair.first;
                 double ld_PeakHeight = lk_Pair.second;
                 ld_PeakHeight /= ld_Factor;
-                ld_Error += pow(ld_PeakHeight - ld_TargetHeight, 2.0);
+                // normalize so that max target height is 1.0
+                ld_TargetHeight /= ld_MaxTargetIntensity;
+                ld_PeakHeight /= ld_MaxTargetIntensity;
+//                 printf("%1.2f / %1.2f\n", ld_TargetHeight, ld_PeakHeight);
+                ld_Error += pow(ld_PeakHeight - ld_TargetHeight, 2.0) * ld_PairFactor;
             }
+            ld_Error /= ld_PairFactorSum;
             ld_Error /= lk_Pairs.size();
         }
     }
@@ -462,25 +484,61 @@ int main(int ai_ArgumentCount, char** ac_Arguments__)
         QList<r_Peak> lk_Peaks = k_ScanIterator::findAllPeaks(lr_Scan.mr_Spectrum);
         for (int li_Charge = li_MinCharge; li_Charge <= li_MaxCharge; ++li_Charge)
         {
-            double ld_MinError = -1.0;
-            int li_MinEfficiency = 0;
-            for (int i = 9500; i <= 10000; i += 1)
+            int li_FinalEfficiency = 0;
+            int li_EfficiencyStart = 9000;
+            int li_EfficiencyEnd = 10000;
+            int li_EfficiencyStep = 100;
+            while (li_EfficiencyStep > 0)
             {
-                double ld_Error = determineFitError(lk_Peaks, i, li_Charge);
-                if (ld_Error >= 0.0)
+                QMultiMap<double, int> lk_TestResults;
+                for (int li_Efficiency = li_EfficiencyStart; li_Efficiency <= li_EfficiencyEnd; li_Efficiency += li_EfficiencyStep)
                 {
-                    if (ld_MinError < 0.0 || ld_Error < ld_MinError)
+                    double ld_Error = determineFitError(lk_Peaks, li_Efficiency, li_Charge);
+                    if (ld_Error >= 0.0)
                     {
-                        ld_MinError = ld_Error;
-                        li_MinEfficiency = i;
+                        lk_TestResults.insert(ld_Error, li_Efficiency);
                     }
+//                      printf("%6.2f%% (%d+) efficiency: %e\n", (double)li_Efficiency / 100.0, li_Charge, ld_Error);
                 }
-//                 printf("%6.2f%% (%d+) efficiency: %e\n", (double)i / 100.0, li_Charge, ld_Error);
-//                  printf("%f,%f\n", (double)i / 10000.0, ld_Error);
+                
+                // abort the search if nothing found
+                if (lk_TestResults.empty())
+                    break;
+                
+                // dig further into the minimum range
+                li_FinalEfficiency = lk_TestResults.values().first();
+
+                li_EfficiencyStart = li_FinalEfficiency;
+                li_EfficiencyStart -= li_EfficiencyStep;
+                li_EfficiencyStart = std::max<int>(li_EfficiencyStart, 0);
+                
+                li_EfficiencyEnd = li_FinalEfficiency;
+                li_EfficiencyEnd += li_EfficiencyStep;
+                li_EfficiencyEnd = std::min<int>(li_EfficiencyEnd, 10000);
+                
+                li_EfficiencyStep /= 10;
             }
-            printf("(%d+): %1.2f%%\n", li_Charge, (double)li_MinEfficiency / 100.0);
+            // the determined labeling efficiency is in li_FinalEfficiency, invalid if 0
+            if (li_FinalEfficiency > 0)
+                printf("(%d+): %1.2f%%\n", li_Charge, (double) li_FinalEfficiency / 100.0);
         }
     }
+    /*
+    foreach (r_Scan lr_Scan, lk_ScanList)
+    {
+        QList<r_Peak> lk_Peaks = k_ScanIterator::findAllPeaks(lr_Scan.mr_Spectrum);
+//         for (int i = 9500; i <= 10000; i += 10)
+        for (int i = 9950; i <= 9950; i += 10)
+        {
+            for (int li_Charge = li_MinCharge; li_Charge <= li_MaxCharge; ++li_Charge)
+            {
+                double ld_Error = determineFitError(lk_Peaks, i, li_Charge);
+                 printf("%6.2f%% (%d+) efficiency: %e\n", (double)i / 100.0, li_Charge, ld_Error);
+//                  printf("%f,%f\n", (double)i / 10000.0, ld_Error);
+            }
+        }
+    }
+    */
     
     delete lk_Quantifier_;
 }

@@ -129,7 +129,7 @@ public:
     // for the peptide
     virtual tk_ScanList estimate(QStringList ak_SpectraFiles, QString as_Peptide, double ad_RetentionTime);
     
-	virtual void handleScan(r_Scan& ar_Scan);
+	virtual void handleScan(r_Scan& ar_Scan, bool& ab_Continue);
 	virtual void progressFunction(QString as_ScanId, bool ab_InterestingScan);
 	
 	virtual QString renderScanAsSvg(r_Scan& ar_Scan, r_ScanQuantitationResult ar_QuantitationResult);

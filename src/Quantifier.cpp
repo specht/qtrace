@@ -374,7 +374,7 @@ tk_ScanList k_Quantifier::estimate(QStringList ak_SpectraFiles, QString as_Pepti
 }
 
 
-void k_Quantifier::handleScan(r_Scan& ar_Scan)
+void k_Quantifier::handleScan(r_Scan& ar_Scan, bool& ab_Continue)
 {
 /*	if (QVariant(ar_Scan.ms_Id).toInt() != 5117)
 		return;*/
@@ -387,8 +387,14 @@ void k_Quantifier::handleScan(r_Scan& ar_Scan)
     
     if (mb_Estimate)
     {
+#define MAX_RT_DIFFERENCE 1.0        
+        if (ar_Scan.md_RetentionTime > md_EstimateRetentionTime + MAX_RT_DIFFERENCE)
+        {
+            ab_Continue = false;
+            return;
+        }
         double ld_Diff = fabs(ar_Scan.md_RetentionTime - md_EstimateRetentionTime);
-        if (ld_Diff > 1.0)
+        if (ld_Diff > MAX_RT_DIFFERENCE)
             return;
         mk_ScanList.append(ar_Scan);
         return;
