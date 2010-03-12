@@ -174,15 +174,6 @@ protected:
     virtual void parseArguments(QStringList& ak_Arguments);
 	virtual double calculatePeptideMass(QString as_Peptide, int ai_Charge);
 	virtual double scale(const double ad_Value) const;
-	virtual r_ScanQuantitationResult 
-		checkResult(QHash<int, r_Peak> ak_LightPeaksInclude, 
-					 QHash<int, r_Peak> ak_HeavyPeaksInclude,
-					 QHash<int, r_Peak> ak_LightPeaksExclude, 
-					 QHash<int, r_Peak> ak_HeavyPeaksExclude,
-					 r_Scan& ar_Scan, QString as_Peptide, 
-					 int ai_Charge, 
-					 QList<double> ak_TargetMz, 
-					 QList<double> ak_ForbiddenMz);
 	double gaussian(double x, double a, double b, double c);
     void parseLabel();
     QStringList tokenize(QString as_String);

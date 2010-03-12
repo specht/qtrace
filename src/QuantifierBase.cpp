@@ -842,128 +842,6 @@ void k_QuantifierBase::removeNonPeptides(QSet<QString>& ak_List)
 }
 
 
-r_ScanQuantitationResult 
-k_QuantifierBase::checkResult(QHash<int, r_Peak> ak_LightPeaksInclude, 
-						   QHash<int, r_Peak> ak_HeavyPeaksInclude,
-						   QHash<int, r_Peak> ak_LightPeaksExclude, 
-						   QHash<int, r_Peak> ak_HeavyPeaksExclude,
-						   r_Scan& ar_Scan, QString as_Peptide, int ai_Charge,
-						   QList<double> ak_TargetMz,
-						   QList<double> ak_ForbiddenMz)
-{
-	r_ScanQuantitationResult lr_Result;
-	lr_Result.mb_IsGood = false;
-	
-	// check whether all inclusion peaks have a good SNR
-	QList<r_Peak> lk_Peaks = ak_LightPeaksInclude.values() + ak_HeavyPeaksInclude.values();
-	
-	// return if no inclusion peaks have been found
-	if (lk_Peaks.empty())
-		return lr_Result;
-	
-	double ld_MinSnr = lk_Peaks.first().md_Snr;
-	for (int i = 1; i < lk_Peaks.size(); ++i)
-		ld_MinSnr = std::min<double>(ld_MinSnr, lk_Peaks[i].md_Snr);
-	
-	if (ld_MinSnr < md_MinSnr)
-		return lr_Result;
-	
-	lr_Result.md_Snr = ld_MinSnr;
-	
-	double ld_LightSum = 0.0;
-	double ld_HeavySum = 0.0;
-	
-	int li_LightPeakIncludeCount = 0;
-	int li_HeavyPeakIncludeCount = 0;
-	int li_LightPeakExcludeCount = 0;
-	int li_HeavyPeakExcludeCount = 0;
-	
-/*	for (int li_Isotope = 0; li_Isotope < mi_WatchIsotopesCount; ++li_Isotope)
-	{
-		if (ak_LightPeaksInclude.contains(li_Isotope))
-		{
-            if (mb_UseArea)
-                ld_LightSum += ak_LightPeaksInclude[li_Isotope].md_PeakArea;
-            else
-                ld_LightSum += ak_LightPeaksInclude[li_Isotope].md_PeakIntensity;
-			++li_LightPeakIncludeCount;
-		}
-		if (ak_LightPeaksExclude.contains(li_Isotope))
-			++li_LightPeakExcludeCount;*/
-/*		for (int k = 0; k < mk_LabeledEnvelopeCountForPeptide[as_Peptide]; ++k)
-		{
-			if (ak_HeavyPeaksInclude.contains(k * mi_WatchIsotopesCount + li_Isotope))
-			{
-                if (mb_UseArea)
-                    ld_HeavySum += ak_HeavyPeaksInclude[k * mi_WatchIsotopesCount + li_Isotope].md_PeakArea;
-                else
-                    ld_HeavySum += ak_HeavyPeaksInclude[k * mi_WatchIsotopesCount + li_Isotope].md_PeakIntensity;
-				++li_HeavyPeakIncludeCount;
-			}
-			if (ak_HeavyPeaksExclude.contains(k * mi_WatchIsotopesCount + li_Isotope))
-				++li_HeavyPeakExcludeCount;
-		}*/
-// 	}
-	
-/*	if (li_LightPeakIncludeCount == mi_WatchIsotopesCount && 
-		li_HeavyPeakIncludeCount == mi_WatchIsotopesCount * mk_LabeledEnvelopeCountForPeptide[as_Peptide])
-	{
-		// both isotope envelopes are complete, we get a ratio!
-		if (mb_CheckLightForbiddenPeaks && ak_LightPeaksExclude.contains(-1))
-			// don't quantify if forbidden peak is present!
-			return lr_Result;
-		if (mb_CheckHeavyForbiddenPeaks)
-		{
-			// and don't quantify if the heavy forbidden peak is present
-			for (int k = 0; k < mk_LabeledEnvelopeCountForPeptide[as_Peptide]; ++k)
-				if (ak_HeavyPeaksExclude.contains(-1 - k))
-					return lr_Result;
-		}
-		lr_Result.md_AmountUnlabeled = ld_LightSum;
-		lr_Result.md_AmountLabeled = ld_HeavySum;
-	}
-	else if (li_LightPeakIncludeCount == mi_WatchIsotopesCount && 
-			 li_HeavyPeakExcludeCount == 0)
-	{
-		// light state only!
-		if (ak_LightPeaksExclude.contains(-1))
-			return lr_Result;
-		lr_Result.md_AmountUnlabeled = ld_LightSum;
-		lr_Result.md_AmountLabeled = 0.0;
-	}
-	else if (li_LightPeakExcludeCount == 0 && 
-			 li_HeavyPeakIncludeCount == mi_WatchIsotopesCount * mk_LabeledEnvelopeCountForPeptide[as_Peptide])
-	{
-		// heavy state only
-		for (int k = 0; k < mk_LabeledEnvelopeCountForPeptide[as_Peptide]; ++k)
-			if (ak_HeavyPeaksExclude.contains(-1 - k))
-				return lr_Result;
-		lr_Result.md_AmountUnlabeled = 0.0;
-		lr_Result.md_AmountLabeled = ld_HeavySum;
-	}
-	else
-	{
-		// no complete isotope envelope
-		return lr_Result;
-	}*/
-	
-	lr_Result.mk_TargetMz = ak_TargetMz;
-	lr_Result.mk_ForbiddenMz = ak_ForbiddenMz;
-	
-	QList<double> lk_AllMz = ak_TargetMz + ak_ForbiddenMz;
-	qSort(lk_AllMz);
-	
-	lr_Result.md_MinMz = lk_AllMz.first();
-	lr_Result.md_MaxMz = lk_AllMz.last();
-	
-	lr_Result.mk_UnlabeledPeaks = ak_LightPeaksInclude.values();
-	lr_Result.mk_LabeledPeaks = ak_HeavyPeaksInclude.values();
-	lr_Result.mb_IsGood = true;
-	
-	return lr_Result;
-}
-
-
 double k_QuantifierBase::gaussian(double x, double a, double b, double c)
 {
 	return a * exp(-(pow(x - b, 2.0) / (2 * c * c)));
@@ -1040,11 +918,11 @@ QHash<int, int> k_QuantifierBase::matchTargetsToPeaks(QList<double> ak_PeakMz, Q
     int li_TargetIndex = 0;
     
     double ld_TargetMz = lk_TargetMz[li_TargetIndex];
-    double ld_Error = ld_TargetMz / ad_MassAccuracy * 1000000.0;
+    double ld_Error = ld_TargetMz * (ad_MassAccuracy / 1000000.0);
     double ld_TargetMzMin = ld_TargetMz - ld_Error;
     double ld_TargetMzMax = ld_TargetMz + ld_Error;
     
-    while (li_TargetIndex < lk_TargetMz.size())
+    while ((li_TargetIndex < lk_TargetMz.size()) && (li_PeakIndex < ak_PeakMz.size()))
     {
         // advance target pointer if necessary
         while (ak_PeakMz[li_PeakIndex] > ld_TargetMzMax)
@@ -1055,7 +933,7 @@ QHash<int, int> k_QuantifierBase::matchTargetsToPeaks(QList<double> ak_PeakMz, Q
             else
             {
                 ld_TargetMz = lk_TargetMz[li_TargetIndex];
-                ld_Error = ld_TargetMz / ad_MassAccuracy * 1000000.0;
+                ld_Error = ld_TargetMz * (ad_MassAccuracy / 1000000.0);
                 ld_TargetMzMin = ld_TargetMz - ld_Error;
                 ld_TargetMzMax = ld_TargetMz + ld_Error;
             }
@@ -1088,8 +966,18 @@ QHash<int, int> k_QuantifierBase::matchTargetsToPeaks(QList<double> ak_PeakMz, Q
             }
             if (lb_Good)
                 lk_PeakForTargetMz[lk_TargetIds[li_TargetIndex]] = li_PeakIndex;
+            
             // advance target pointer even if this was ambiguous
             ++li_TargetIndex;
+            if (li_TargetIndex >= lk_TargetMz.size())
+                break;
+            else
+            {
+                ld_TargetMz = lk_TargetMz[li_TargetIndex];
+                ld_Error = ld_TargetMz * (ad_MassAccuracy / 1000000.0);
+                ld_TargetMzMin = ld_TargetMz - ld_Error;
+                ld_TargetMzMax = ld_TargetMz + ld_Error;
+            }
         }
         else
         {
@@ -1098,7 +986,6 @@ QHash<int, int> k_QuantifierBase::matchTargetsToPeaks(QList<double> ak_PeakMz, Q
                 break;
         }
     }
-    
     return lk_PeakForTargetMz;
     /*
     {
