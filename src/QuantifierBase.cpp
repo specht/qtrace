@@ -1035,21 +1035,41 @@ QHash<int, int> k_QuantifierBase::matchTargetsToPeaks(QList<double> ak_PeakMz, Q
     // after parallel searching, this list will contain for 
     // each target m/z value the peak which is closest to it
     QHash<int, int> lk_PeakForTargetMz;
-
+    
     int li_PeakIndex = 0;
     int li_TargetIndex = 0;
     
+    double ld_TargetMz = lk_TargetMz[li_TargetIndex];
+    double ld_Error = ld_TargetMz / ad_MassAccuracy * 1000000.0;
+    double ld_TargetMzMin = ld_TargetMz - ld_Error;
+    double ld_TargetMzMax = ld_TargetMz + ld_Error;
+    
     while (li_TargetIndex < lk_TargetMz.size())
     {
-        double ld_TargetMz = lk_TargetMz[li_TargetIndex];
-        double ld_Error = ld_TargetMz / ad_MassAccuracy * 1000000.0;
-        double ld_TargetMzMin = ld_TargetMz - ld_Error;
-        double ld_TargetMzMax = ld_TargetMz + ld_Error;
+        // advance target pointer if necessary
+        while (ak_PeakMz[li_PeakIndex] > ld_TargetMzMax)
+        {
+            ++li_TargetIndex;
+            if (li_TargetIndex >= lk_TargetMz.size())
+                break;
+            else
+            {
+                ld_TargetMz = lk_TargetMz[li_TargetIndex];
+                ld_Error = ld_TargetMz / ad_MassAccuracy * 1000000.0;
+                ld_TargetMzMin = ld_TargetMz - ld_Error;
+                ld_TargetMzMax = ld_TargetMz + ld_Error;
+            }
+        }
+        if (li_TargetIndex >= lk_TargetMz.size())
+            break;
         
-        while ((li_PeakIndex < ak_PeakMz.size()) && (ak_PeakMz[li_PeakIndex] < ld_TargetMzMin))
+        // advance peak pointer if necessary
+        while (ak_PeakMz[li_PeakIndex] < ld_TargetMzMin)
+        {
             ++li_PeakIndex;
-        
-        // no more peaks, abort
+            if (li_PeakIndex >= ak_PeakMz.size())
+                break;
+        }
         if (li_PeakIndex >= ak_PeakMz.size())
             break;
         
@@ -1068,13 +1088,18 @@ QHash<int, int> k_QuantifierBase::matchTargetsToPeaks(QList<double> ak_PeakMz, Q
             }
             if (lb_Good)
                 lk_PeakForTargetMz[lk_TargetIds[li_TargetIndex]] = li_PeakIndex;
-            // advance target pointer
+            // advance target pointer even if this was ambiguous
             ++li_TargetIndex;
+        }
+        else
+        {
+            ++li_PeakIndex;
+            if (li_PeakIndex >= ak_PeakMz.size())
+                break;
         }
     }
     
     return lk_PeakForTargetMz;
-    
     /*
     {
         // put all target m/z values into the appropriate bucket
