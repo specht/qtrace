@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2007-2009 Michael Specht
+Copyright (c) 2007-2010 Michael Specht
 
 This file is part of qTrace.
 
@@ -21,6 +21,48 @@ along with qTrace.  If not, see <http://www.gnu.org/licenses/>.
 #include <QtCore>
 #include <ptb/ScanIterator.h>
 #include <ptb/IsotopeEnvelope.h>
+#include <ptb/RefPtr.h>
+
+
+#define DEFAULT_LABEL "15N"
+#define DEFAULT_SCAN_TYPE "all"
+#define DEFAULT_USE_ISOTOPE_ENVELOPES true
+#define DEFAULT_MIN_CHARGE 2
+#define DEFAULT_MAX_CHARGE 3
+#define DEFAULT_MIN_SNR 2.0
+#define DEFAULT_MASS_ACCURACY 5.0
+#define DEFAULT_REQUIRE_ABUNDANCE 0.5
+#define DEFAULT_CONSIDER_ABUNDANCE 0.05
+#define DEFAULT_MAX_FIT_ERROR 0.05
+#define DEFAULT_CHECK_FORBIDDEN_PEAK true
+#define DEFAULT_QUIET false
+#define DEFAULT_CSV_OUTPUT true
+#define DEFAULT_XHTML_OUTPUT true
+#define DEFAULT_LOG_SCALE true
+
+struct r_Parameter
+{
+    enum Enumeration
+    {
+        Label,
+        ScanType,
+        UseIsotopeEnvelopes,
+        MinCharge,
+        MaxCharge,
+        MinSnr,
+        MassAccuracy,
+        RequireAbundance,
+        ConsiderAbundance,
+        MaxFitError,
+        CheckForbiddenPeak,
+        Quiet,
+        CsvOutput,
+        CsvOutputPath,
+        XhtmlOutput,
+        XhtmlOutputPath,
+        LogScale
+    };
+};
 
 
 struct r_IsotopeAbundance
@@ -41,23 +83,21 @@ struct r_IsotopeAbundance
     float mf_Efficiency;
 };
 
+
+struct r_EnvelopePeaks
+{
+    QSet<int> mk_RequiredIds;
+    QSet<int> mk_ConsideredIds;
+    QSet<int> mk_ForbiddenIds;
+};
+
+
 // tk_ArtificialEnvironment defines an artificial environment in
 // which the abundances of the isotopes are modified (like 99% 15N)
 typedef QHash<QString, r_IsotopeAbundance> tk_ArtificialEnvironment;
 
 typedef QPair<int, r_Scan> tk_IntScanPair;
 typedef QList<r_Scan> tk_ScanList;
-
-
-struct r_AmountEstimation
-{
-    enum Enumeration {
-        Profile = 0,
-        Intensity = 1,
-        Area = 2,
-        Size
-    };
-};
 
 
 struct r_ScanQuantitationResult
@@ -106,44 +146,34 @@ typedef QPair<double, double> tk_DoublePair;
 typedef QHash<QString, double> tk_StringDoubleHash;
 
 
-class k_Quantifier: public k_ScanIterator
+class k_QuantifierBase: public k_ScanIterator
 {
 public:
-	k_Quantifier(QString as_Label, r_ScanType::Enumeration ae_ScanType,
-                 r_AmountEstimation::Enumeration ab_UseArea,
-				 QList<tk_IntPair> ak_MsLevels,
-				 int ai_MinCharge, int ai_MaxCharge, 
-				 double ad_MinSnr, double ad_MassAccuracy,
-                 double ad_RequireAbundance, double ad_ConsiderAbundance,
-                 double ad_MaxFitError, QIODevice* ak_CsvOutDevice_, 
-                 QIODevice* ak_XhtmlOutDevice_, bool ab_CheckForbiddenPeak, 
-                 bool ab_PrintStatusMessages, bool ab_LogScale);
-	virtual ~k_Quantifier();
+	k_QuantifierBase(QStringList& ak_Arguments, QSet<r_Parameter::Enumeration> ak_Parameters, QString as_ProgramName, QString as_AdditionalArguments = QString());
+	virtual ~k_QuantifierBase();
 	
-	// quantify takes a list of spectra files and a list of peptides
-    // qTrace only quantifies on the peptide level
-	virtual void quantify(QStringList ak_SpectraFiles, QStringList ak_Peptides, bool ab_Estimate = false);
-    
-    // estimate takes a list of spectra files and a hash of 
-    // peptide => retention time and returns a list of scans which where just right
-    // for the peptide
-    virtual tk_ScanList estimate(QStringList ak_SpectraFiles, QString as_Peptide, double ad_RetentionTime);
-    
-	virtual void handleScan(r_Scan& ar_Scan, bool& ab_Continue);
 	virtual void progressFunction(QString as_ScanId, bool ab_InterestingScan);
 	
 	virtual QString renderScanAsSvg(r_Scan& ar_Scan, r_ScanQuantitationResult ar_QuantitationResult);
     QHash<QString, int> compositionForPeptide(const QString& as_Peptide);
-    double leastSquaresFit(QList<tk_DoublePair> ak_Pairs);
+    void leastSquaresFit(QList<tk_DoublePair> ak_Pairs, double* ad_Factor_, double* ad_Error_);
     
     // parallel mass matching, attention: both lists must be sorted!
-    QHash<int, int> matchTargetsToPeaks(QList<double> ak_PeakMz, QList<double> ak_TargetMz, double ad_MassAccuracy);
+    QHash<int, int> matchTargetsToPeaks(QList<double> ak_PeakMz, QMultiMap<double, int> ak_Targets, double ad_MassAccuracy);
     QHash<int, int> extractMatches(QSet<int> ak_Ids, QList<int> ak_TargetIdsSorted, QHash<int, int> ak_Matches);
+    virtual void calculateMeanAndStandardDeviation(QList<double> ak_Values, double* ad_Mean_, double* ad_StandardDeviation_);
+    
+    void printUsageAndExit();
+    bool stringToBool(QString as_String);
+    int stringToInt(QString as_String);
+    double stringToDouble(QString as_String);
+    
+    void removeNonPeptides(QSet<QString>& ak_List);
 	
 protected:
+    virtual void parseArguments(QStringList& ak_Arguments);
 	virtual double calculatePeptideMass(QString as_Peptide, int ai_Charge);
 	virtual double scale(const double ad_Value) const;
-	virtual void calculateMeanAndStandardDeviation(QList<double> ak_Values, double* ad_Mean_, double* ad_StandardDeviation_);
 	virtual r_ScanQuantitationResult 
 		checkResult(QHash<int, r_Peak> ak_LightPeaksInclude, 
 					 QHash<int, r_Peak> ak_HeavyPeaksInclude,
@@ -153,58 +183,53 @@ protected:
 					 int ai_Charge, 
 					 QList<double> ak_TargetMz, 
 					 QList<double> ak_ForbiddenMz);
-	void fitGaussian(double* a_, double* b_, double* c_, double x0, double y0, 
-					 double x1, double y1, double x2, double y2);
 	double gaussian(double x, double a, double b, double c);
     void parseLabel();
     QStringList tokenize(QString as_String);
     QString fetchNextToken(QStringList* ak_StringList_, QVariant::Type* ae_Type_);
     QVariant::Type peekNextToken(QStringList ak_StringList);
+    tk_IsotopeEnvelope lightEnvelopeForPeptide(QString as_Peptide);
     tk_IsotopeEnvelope heavyEnvelopeForPeptide(QString as_Peptide);
 
-	QTextStream mk_CsvOutStream;
-	QTextStream mk_XhtmlOutStream;
+    // general information
+    QSet<r_Parameter::Enumeration> mk_Parameters;
+    QString ms_ProgramName;
+    QString ms_AdditionalArguments;
+
+    // parameters
 	QString ms_Label;
-    r_AmountEstimation::Enumeration me_AmountEstimation;
+    bool mb_UseIsotopeEnvelopes;
 	int mi_MinCharge;
 	int mi_MaxCharge;
 	double md_MinSnr;
 	double md_MassAccuracy;
-	bool mb_CheckForbiddenPeak;
     double md_RequireAbundance;
     double md_ConsiderAbundance;
     double md_MaxFitError;
-	bool mb_PrintStatusMessages;
+    bool mb_CheckForbiddenPeak;
+	bool mb_Quiet;
     bool mb_LogScale;
-	QList<double> mk_AllTargetMasses;
-	QString ms_CurrentSpot;
-	QStringList mk_Peptides;
-    double md_EstimateRetentionTime;
+    
 	QHash<char, double> mk_AminoAcidWeight;
     QHash<char, QHash<QString, int> > mk_AminoAcidComposition;
     
-    QHash<QString, QSet<QString> > mk_UnlabeledRequiredTargetMzForPeptideCharge;
-    QHash<QString, QStringList> mk_UnlabeledConsideredLeftTargetMzForPeptideCharge;
-    QHash<QString, QStringList> mk_UnlabeledConsideredRightTargetMzForPeptideCharge;
-    QHash<QString, QSet<QString> > mk_LabeledRequiredTargetMzForPeptideCharge;
-    QHash<QString, QStringList> mk_LabeledConsideredLeftTargetMzForPeptideCharge;
-    QHash<QString, QStringList> mk_LabeledConsideredRightTargetMzForPeptideCharge;
+    RefPtr<QIODevice> mk_pCsvDevice;
+    RefPtr<QIODevice> mk_pXhtmlDevice;
     
-    QHash<QString, tk_IsotopeEnvelope> mk_UnlabeledIsotopeEnvelopeForPeptideCharge;
-    QHash<QString, tk_IsotopeEnvelope> mk_LabeledIsotopeEnvelopeForPeptideCharge;
-	
+    RefPtr<QTextStream> mk_pCsvStream;
+    RefPtr<QTextStream> mk_pXhtmlStream;
+    
 	// peptide-charge-label-isotope
 	QHash<QString, int> mk_TargetMzIndex;
 	
-    k_IsotopeEnvelope mk_IsotopeEnvelope;
-    //QHash<QString, QList<double> > mk_IsotopeEnvelopesLight;
-	
-	//QHash<QString, QList<QList<double> > > mk_ElutionProfile;
     double md_WaterMass;
     double md_HydrogenMass;
     
+    QString ms_CurrentSpectraFile;
+
+    // natural isotope envelope generator
+    k_IsotopeEnvelope mk_IsotopeEnvelope;
+    // this hash contains a heavy isotope generator for every labeled amino acid
     QHash<QString, k_IsotopeEnvelope> mk_HeavyIsotopeEnvelopeForAminoAcid;
     QHash<QString, tk_ArtificialEnvironment> mk_Label;
-    bool mb_Estimate;
-    tk_ScanList mk_ScanList;
 };

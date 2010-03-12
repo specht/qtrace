@@ -314,7 +314,7 @@ void k_Quantifier::handleScan(r_Scan& ar_Scan, bool& ab_Continue)
                 QList<tk_DoublePair> lk_Pairs_[2] = {QList<tk_DoublePair>(), QList<tk_DoublePair>()};
                 double ld_FitFactor_[2] = {0.0, 0.0};
                 double ld_FitError_[2] = {0.0, 0.0};
-                bool lb_Good_[2] = {true, true};
+                bool lb_Good_[2] = {false, false};
                 
                 for (int li_Envelope = 0; li_Envelope < 2; ++li_Envelope)
                 {
@@ -350,6 +350,8 @@ void k_Quantifier::handleScan(r_Scan& ar_Scan, bool& ab_Continue)
                             lb_Good_[0] = lb_Good_[1] = false;
                             break;
                         }
+                        else
+                            lb_Good_[li_Envelope] = true;
                     }
                 }
                 if (lb_Good_[0] || lb_Good_[1])

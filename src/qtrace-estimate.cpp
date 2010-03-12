@@ -47,6 +47,9 @@ double ld_MaxFitError = 0.01;
 bool lb_CheckForbiddenPeak = true;
 bool lb_PrintStatusMessages = true;
 bool lb_LogScale = true;
+bool lb_QuickSearch = true;
+int li_EfficiencySearchStart = 9000;
+int li_EfficiencySearchEnd = 10000;
 
 QHash<QString, int> lk_Composition;
 QHash<int, tk_IsotopeEnvelope> lk_IsotopeEnvelopes;
@@ -59,12 +62,15 @@ void printUsageAndExit()
 	printf("Usage: qtrace-estimate [options] [spectra file] [peptide] [retention time]\n");
 	printf("The spectra file may be mzData, mzXML or mzML, optionally compressed (.gz|.bz2|.zip).\n");
 	printf("Options:\n");
+    printf("  --searchType [quick|exhaustive] (default: quick)\n");
+    printf("  --efficiencyMin [float] (default: 0.9)\n");
+    printf("  --efficiencyMax [float] (default: 1.0)\n");
 	printf("  --scanType [full|sim|all] (default: all)\n");
 	printf("  --minCharge [int] (default: 2)\n");
 	printf("  --maxCharge [int] (default: 3)\n");
 	printf("  --minSnr [float] (default: 2.0)\n");
 	printf("  --massAccuracy (ppm) [float] (default: 5.0)\n");
-	printf("      This mass accuracy is used to check for the presence of peaks.\n");
+	printf("      Specify the mass accuracy that should be used for peak matching.\n");
     printf("  --requireAbundance [float] (default: 0.5)\n");
     printf("      Specify which peaks must be present in an isotope envelope.\n");
     printf("  --considerAbundance [float] (default: 0.05)\n");
@@ -322,6 +328,65 @@ int main(int ai_ArgumentCount, char** ac_Arguments__)
 		}
 	}
 	
+    li_Index = lk_Arguments.indexOf("--searchType");
+    if (li_Index > -1)
+    {
+        QString ls_Value = lk_Arguments[li_Index + 1];
+        lk_Arguments.removeAt(li_Index);
+        lk_Arguments.removeAt(li_Index);
+        if (ls_Value == "quick")
+            lb_QuickSearch = true;
+        else if (ls_Value == "exhaustive")
+            lb_QuickSearch = false;
+        else
+        {
+            printf("Error: unknown search type %s.\n", ls_Value.toStdString().c_str());
+            exit(1);
+        }
+    }
+    
+    li_Index = lk_Arguments.indexOf("--efficiencyMin");
+    if (li_Index > -1)
+    {
+        QString ls_Value = lk_Arguments[li_Index + 1];
+        lk_Arguments.removeAt(li_Index);
+        lk_Arguments.removeAt(li_Index);
+        bool lb_Ok = true;
+        double ld_Value = ls_Value.toDouble(&lb_Ok);
+        if (!lb_Ok)
+        {
+            printf("Error: Invalid float: %s.\n", ls_Value.toStdString().c_str());
+            exit(1);
+        }
+        if (ld_Value < 0.0 || ld_Value > 1.0)
+        {
+            printf("Error: minimum labelling efficiency must be within a range from 0 to 1.\n");
+            exit(1);
+        }
+        li_EfficiencySearchStart = (int)(ld_Value * 10000.0);
+    }
+    
+    li_Index = lk_Arguments.indexOf("--efficiencyMax");
+    if (li_Index > -1)
+    {
+        QString ls_Value = lk_Arguments[li_Index + 1];
+        lk_Arguments.removeAt(li_Index);
+        lk_Arguments.removeAt(li_Index);
+        bool lb_Ok = true;
+        double ld_Value = ls_Value.toDouble(&lb_Ok);
+        if (!lb_Ok)
+        {
+            printf("Error: Invalid float: %s.\n", ls_Value.toStdString().c_str());
+            exit(1);
+        }
+        if (ld_Value < 0.0 || ld_Value > 1.0)
+        {
+            printf("Error: maximum labelling efficiency must be within a range from 0 to 1.\n");
+            exit(1);
+        }
+        li_EfficiencySearchEnd = (int)(ld_Value * 10000.0);
+    }
+    
 	li_Index = lk_Arguments.indexOf("--minCharge");
 	if (li_Index > -1)
 	{
@@ -477,6 +542,8 @@ int main(int ai_ArgumentCount, char** ac_Arguments__)
     ld_BaseMass = lk_IsotopeEnvelope.massForComposition(lk_Composition);
         
 	tk_ScanList lk_ScanList = lk_Quantifier_->estimate(lk_SpectraFiles, ls_Peptide, ld_RetentionTime);
+    
+    QList<double> lk_DeterminedEfficiencies;
 
     // now check the scan list
     foreach (r_Scan lr_Scan, lk_ScanList)
@@ -484,19 +551,29 @@ int main(int ai_ArgumentCount, char** ac_Arguments__)
         QList<r_Peak> lk_Peaks = k_ScanIterator::findAllPeaks(lr_Scan.mr_Spectrum);
         for (int li_Charge = li_MinCharge; li_Charge <= li_MaxCharge; ++li_Charge)
         {
+            QMap<int, double> lk_ErrorForEfficiency;
             int li_FinalEfficiency = 0;
-            int li_EfficiencyStart = 9000;
-            int li_EfficiencyEnd = 10000;
+            int li_EfficiencyStart = li_EfficiencySearchStart;
+            int li_EfficiencyEnd = li_EfficiencySearchEnd;
             int li_EfficiencyStep = 100;
+            // if we do the exhaustive search, sample every single point directly
+            if (!lb_QuickSearch)
+                li_EfficiencyStep = 1;
             while (li_EfficiencyStep > 0)
             {
                 QMultiMap<double, int> lk_TestResults;
                 for (int li_Efficiency = li_EfficiencyStart; li_Efficiency <= li_EfficiencyEnd; li_Efficiency += li_EfficiencyStep)
                 {
-                    double ld_Error = determineFitError(lk_Peaks, li_Efficiency, li_Charge);
+                    double ld_Error = -1.0;
+                    // re-use cached result if possible
+                    if (lk_ErrorForEfficiency.contains(li_Efficiency))
+                        ld_Error = lk_ErrorForEfficiency[li_Efficiency];
+                    else
+                        ld_Error = determineFitError(lk_Peaks, li_Efficiency, li_Charge);
                     if (ld_Error >= 0.0)
                     {
                         lk_TestResults.insert(ld_Error, li_Efficiency);
+                        lk_ErrorForEfficiency.insert(li_Efficiency, ld_Error);
                     }
 //                      printf("%6.2f%% (%d+) efficiency: %e\n", (double)li_Efficiency / 100.0, li_Charge, ld_Error);
                 }
@@ -520,25 +597,21 @@ int main(int ai_ArgumentCount, char** ac_Arguments__)
             }
             // the determined labeling efficiency is in li_FinalEfficiency, invalid if 0
             if (li_FinalEfficiency > 0)
-                printf("(%d+): %1.2f%%\n", li_Charge, (double) li_FinalEfficiency / 100.0);
-        }
-    }
-    /*
-    foreach (r_Scan lr_Scan, lk_ScanList)
-    {
-        QList<r_Peak> lk_Peaks = k_ScanIterator::findAllPeaks(lr_Scan.mr_Spectrum);
-//         for (int i = 9500; i <= 10000; i += 10)
-        for (int i = 9950; i <= 9950; i += 10)
-        {
-            for (int li_Charge = li_MinCharge; li_Charge <= li_MaxCharge; ++li_Charge)
             {
-                double ld_Error = determineFitError(lk_Peaks, i, li_Charge);
-                 printf("%6.2f%% (%d+) efficiency: %e\n", (double)i / 100.0, li_Charge, ld_Error);
-//                  printf("%f,%f\n", (double)i / 10000.0, ld_Error);
+                lk_DeterminedEfficiencies.append((double)li_FinalEfficiency / 10000.0);
+//                 printf("scan #%s (%d+): %1.2f%%\n", lr_Scan.ms_Id.toStdString().c_str(), li_Charge, (double)li_FinalEfficiency / 100.0);
             }
+/*                foreach (int li_Efficiency, lk_ErrorForEfficiency.keys())
+                    printf("%1.2f,%f\n", (double)li_Efficiency / 100.0, lk_ErrorForEfficiency[li_Efficiency]);*/
         }
     }
-    */
+    
+    double ld_Mean, ld_SD;
+    qSort(lk_DeterminedEfficiencies.begin(), lk_DeterminedEfficiencies.end());
+    lk_Quantifier_->calculateMeanAndStandardDeviation(lk_DeterminedEfficiencies, &ld_Mean, &ld_SD);
+    printf("%1.2f%% (SD %1.2f%%, RSD %1.4f): %s\n", 
+           ld_Mean * 100.0, ld_SD * 100.0, ld_SD / ld_Mean,
+           ls_Peptide.toStdString().c_str());
     
     delete lk_Quantifier_;
 }

@@ -29,7 +29,3 @@ function toggle(id, flag)
 </script>
 </head>
 <body>
-<table>
-<tr>
-<th>Filename</th><th>Scan id</th><th>Peptide</th><th>Amount light</th><th>Amount heavy</th><th>Retention time</th><th>Charge</th><th>Filter line</th><th>SNR</th>
-</tr>

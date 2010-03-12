@@ -8,9 +8,8 @@ CONFIG(debug, debug|release) {
 RESOURCES += ../../src/qtrace.qrc
 
 HEADERS += \
-	../../src/Quantifier.h \
-	../../src/Tango.h \
+	../../src/Estimator.h \
 
 SOURCES += \
-	../../src/Quantifier.cpp \
+	../../src/Estimator.cpp \
 	../../src/qtrace-estimate.cpp \

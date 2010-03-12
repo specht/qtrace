@@ -36,3 +36,10 @@ else {
 DESTDIR = ../../
 
 QT = core xml svg gui
+
+HEADERS += \
+    ../../src/QuantifierBase.h \
+    ../../src/Tango.h \
+
+SOURCES += \
+    ../../src/QuantifierBase.cpp \
