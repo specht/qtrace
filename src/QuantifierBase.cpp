@@ -914,8 +914,15 @@ QHash<int, int> k_QuantifierBase::matchTargetsToPeaks(QList<double> ak_PeakMz, Q
     // each target m/z value the peak which is closest to it
     QHash<int, int> lk_PeakForTargetMz;
     
+    if (lk_TargetMz.empty() || ak_PeakMz.empty())
+        return lk_PeakForTargetMz;
+    
     int li_PeakIndex = 0;
     int li_TargetIndex = 0;
+    
+    double ld_MzPointer = std::min<double>(lk_TargetMz[li_TargetIndex], ak_PeakMz[li_PeakIndex]);
+    
+    // CONTINUE HERE!!
     
     double ld_TargetMz = lk_TargetMz[li_TargetIndex];
     double ld_Error = ld_TargetMz * (ad_MassAccuracy / 1000000.0);

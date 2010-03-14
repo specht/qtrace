@@ -321,7 +321,7 @@ void k_Quantifier::handleScan(r_Scan& ar_Scan, bool& ab_Continue)
                     QString ls_PeptideChargeWeightKey = QString("%1-%2-%3").arg(ls_Peptide).arg(li_Charge).arg(li_Envelope);
 
                     // don't quantify this at all if the forbidden peak was there
-                    if (li_Envelope == 0 && (mb_CheckForbiddenPeak && (!(mk_TargetsForPeptideChargeWeight[ls_PeptideChargeWeightKey].mk_ForbiddenIds & lk_MatchedTargetIds).empty())))
+                    if ((li_Envelope == 0) && (mb_CheckForbiddenPeak && (!(mk_TargetsForPeptideChargeWeight[ls_PeptideChargeWeightKey].mk_ForbiddenIds & lk_MatchedTargetIds).empty())))
                     {
                         lb_Good_[0] = lb_Good_[1] = false;
                         break;
@@ -347,8 +347,7 @@ void k_Quantifier::handleScan(r_Scan& ar_Scan, bool& ab_Continue)
                         leastSquaresFit(lk_Pairs_[li_Envelope], &ld_FitFactor_[li_Envelope], &ld_FitError_[li_Envelope]);
                         if (ld_FitError_[li_Envelope] > md_MaxFitError)
                         {
-                            lb_Good_[0] = lb_Good_[1] = false;
-                            break;
+                            lb_Good_[li_Envelope] = false;
                         }
                         else
                             lb_Good_[li_Envelope] = true;
