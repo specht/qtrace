@@ -919,11 +919,14 @@ QHash<int, int> k_QuantifierBase::matchTargetsToPeaks(QList<double> ak_PeakMz, Q
     
     int li_PeakIndex = 0;
     int li_TargetIndex = 0;
+    int li_PeakIndexNext = 0;
+    int li_TargetIndexNext = 0;
     
-    double ld_MzPointer = std::min<double>(lk_TargetMz[li_TargetIndex], ak_PeakMz[li_PeakIndex]);
-    
-    // CONTINUE HERE!!
-    
+    if (lk_TargetMz[li_TargetIndex] < ak_PeakMz[li_PeakIndex])
+        li_TargetIndexNext = li_TargetIndex + 1;
+    else
+        li_PeakIndexNext = li_PeakIndex + 1;
+        
     double ld_TargetMz = lk_TargetMz[li_TargetIndex];
     double ld_Error = ld_TargetMz * (ad_MassAccuracy / 1000000.0);
     double ld_TargetMzMin = ld_TargetMz - ld_Error;
@@ -931,138 +934,53 @@ QHash<int, int> k_QuantifierBase::matchTargetsToPeaks(QList<double> ak_PeakMz, Q
     
     while ((li_TargetIndex < lk_TargetMz.size()) && (li_PeakIndex < ak_PeakMz.size()))
     {
-        // advance target pointer if necessary
-        while (ak_PeakMz[li_PeakIndex] > ld_TargetMzMax)
+        // check if we have a match
+        if ((ak_PeakMz[li_PeakIndex] >= ld_TargetMzMin) && (ak_PeakMz[li_PeakIndex] <= ld_TargetMzMax))
         {
-            ++li_TargetIndex;
-            if (li_TargetIndex >= lk_TargetMz.size())
-                break;
-            else
+            // it's a match... but is it unambiguous?
+            // check left and right peak
+            bool lb_Unambiguous = true;
+            if (li_PeakIndex > 0)
             {
-                ld_TargetMz = lk_TargetMz[li_TargetIndex];
-                ld_Error = ld_TargetMz * (ad_MassAccuracy / 1000000.0);
-                ld_TargetMzMin = ld_TargetMz - ld_Error;
-                ld_TargetMzMax = ld_TargetMz + ld_Error;
+                if (ak_PeakMz[li_PeakIndex - 1] >= ld_TargetMzMin)
+                    lb_Unambiguous = false;
             }
-        }
-        if (li_TargetIndex >= lk_TargetMz.size())
-            break;
-        
-        // advance peak pointer if necessary
-        while (ak_PeakMz[li_PeakIndex] < ld_TargetMzMin)
-        {
-            ++li_PeakIndex;
-            if (li_PeakIndex >= ak_PeakMz.size())
-                break;
-        }
-        if (li_PeakIndex >= ak_PeakMz.size())
-            break;
-        
-        double ld_PeakMz = ak_PeakMz[li_PeakIndex];
-        if ((ld_PeakMz >= ld_TargetMzMin) && (ld_PeakMz <= ld_TargetMzMax))
-        {
-            // we found a match, but is it unambiguous?
-            bool lb_Good = true;
             if (li_PeakIndex < ak_PeakMz.size() - 1)
             {
-                // if there is at least one more peak, check whether it disturbs
-                double ld_NextPeakMz = ak_PeakMz[li_PeakIndex + 1];
-                if (ld_NextPeakMz <= ld_TargetMzMax)
-                    // no, it is in the way, don't use this
-                    lb_Good = false;
+                if (ak_PeakMz[li_PeakIndex + 1] <= ld_TargetMzMax)
+                    lb_Unambiguous = false;
             }
-            if (lb_Good)
-                lk_PeakForTargetMz[lk_TargetIds[li_TargetIndex]] = li_PeakIndex;
-            
-            // advance target pointer even if this was ambiguous
-            ++li_TargetIndex;
+//             printf("trying %d => %d (%s)\n", li_TargetIndex, li_PeakIndex, lb_Unambiguous ? "SUCCESS" : "FAIL");
+            if (lb_Unambiguous)
+            {
+                // yes, it's unambiguous, record the match
+                lk_PeakForTargetMz[li_TargetIndex] = li_PeakIndex;
+            }
+        }
+        if (li_TargetIndexNext >= lk_TargetMz.size() || li_PeakIndexNext >= ak_PeakMz.size())
+            break;
+        // advance whichever pointer comes next
+        if (lk_TargetMz[li_TargetIndexNext] < ak_PeakMz[li_PeakIndexNext])
+        {
+            li_TargetIndex = li_TargetIndexNext;
+            li_TargetIndexNext = li_TargetIndex + 1;
             if (li_TargetIndex >= lk_TargetMz.size())
                 break;
-            else
-            {
-                ld_TargetMz = lk_TargetMz[li_TargetIndex];
-                ld_Error = ld_TargetMz * (ad_MassAccuracy / 1000000.0);
-                ld_TargetMzMin = ld_TargetMz - ld_Error;
-                ld_TargetMzMax = ld_TargetMz + ld_Error;
-            }
+            
+            ld_TargetMz = lk_TargetMz[li_TargetIndex];
+            ld_Error = ld_TargetMz * (ad_MassAccuracy / 1000000.0);
+            ld_TargetMzMin = ld_TargetMz - ld_Error;
+            ld_TargetMzMax = ld_TargetMz + ld_Error;
         }
         else
         {
-            ++li_PeakIndex;
+            li_PeakIndex = li_PeakIndexNext;
+            li_PeakIndexNext = li_PeakIndex + 1;
             if (li_PeakIndex >= ak_PeakMz.size())
                 break;
         }
     }
     return lk_PeakForTargetMz;
-    /*
-    {
-        // put all target m/z values into the appropriate bucket
-        QList<r_Bucket> lk_NewBuckets;
-        foreach (r_Bucket lr_Bucket, lk_Buckets)
-        {
-            if (lr_Bucket.mi_Length <= 1)
-            {
-                for (int i = 0; i < lr_Bucket.mk_Entries.size(); ++i)
-                {
-                    int li_PeakIndex = lr_Bucket.mi_Start;
-                    double ld_TargetMass = lk_TargetMz[lr_Bucket.mk_Entries[i]];
-                    double ld_PeakMass = ak_PeakMz[li_PeakIndex];
-                    double ld_MassError = fabs(ld_PeakMass - ld_TargetMass) / ld_TargetMass * 1000000.0;
-                    if (ld_MassError <= ad_MassAccuracy)
-                    {
-                        // the match is good, now check the adjacent peaks, if any
-                        bool lb_Good = true;
-                        if (li_PeakIndex > 0)
-                        {
-                            double ld_OtherPeakMass = ak_PeakMz[li_PeakIndex - 1];
-                            double ld_OtherMassError = fabs(ld_OtherPeakMass - ld_TargetMass) / ld_TargetMass * 1000000.0;
-                            if (ld_OtherMassError <= ad_MassAccuracy)
-                                lb_Good = false;
-                        }
-                        if (li_PeakIndex < ak_PeakMz.size() - 1)
-                        {
-                            double ld_OtherPeakMass = ak_PeakMz[li_PeakIndex + 1];
-                            double ld_OtherMassError = fabs(ld_OtherPeakMass - ld_TargetMass) / ld_TargetMass * 1000000.0;
-                            if (ld_OtherMassError <= ad_MassAccuracy)
-                                lb_Good = false;
-                        }
-                        if (lb_Good)
-                            lk_PeakForTargetMz[lk_TargetIds[lr_Bucket.mk_Entries[i]]] = li_PeakIndex;
-                    }
-                }
-            }
-            else
-            {
-                // split this bucket and create left and right children
-                int li_HalfSize = lr_Bucket.mi_Length / 2;
-                r_Bucket lr_LeftChild(lr_Bucket.mi_Start, li_HalfSize);
-                r_Bucket lr_RightChild(lr_Bucket.mi_Start + li_HalfSize, lr_Bucket.mi_Length - li_HalfSize);
-                double ld_LeftBorder = ak_PeakMz[lr_RightChild.mi_Start - 1];
-                double ld_RightBorder = ak_PeakMz[lr_RightChild.mi_Start];
-                double ld_Razor = (ld_LeftBorder + ld_RightBorder) * 0.5;
-                
-                // now determine which target m/z entries go into the 
-                // left child and which go into the right child
-                
-                // TODO: this could be sped up because everything is sorted
-                for (int i = 0; i < lr_Bucket.mk_Entries.size(); ++i)
-                {
-                    if (lk_TargetMz[lr_Bucket.mk_Entries[i]] > ld_Razor)
-                        lr_RightChild.mk_Entries.push_back(lr_Bucket.mk_Entries[i]);
-                    else
-                        lr_LeftChild.mk_Entries.push_back(lr_Bucket.mk_Entries[i]);
-                }
-                
-                if (!lr_LeftChild.mk_Entries.empty())
-                    lk_NewBuckets.push_back(lr_LeftChild);
-                if (!lr_RightChild.mk_Entries.empty())
-                    lk_NewBuckets.push_back(lr_RightChild);
-            }
-        }
-        lk_Buckets = lk_NewBuckets;
-    }    
-    return lk_PeakForTargetMz;
-    */
 }
 
 
