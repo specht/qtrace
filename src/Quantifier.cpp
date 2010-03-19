@@ -46,6 +46,9 @@ void k_Quantifier::run()
     
     removeNonPeptides(mk_Peptides);
     
+    printf("Calculating target peaks for %d peptides...", mk_Peptides.size());
+    fflush(stdout);
+    
     // create target peaks
     if (mb_UseIsotopeEnvelopes)
     {
@@ -117,6 +120,9 @@ void k_Quantifier::run()
             }
         }
     }
+    
+    printf("done.\n");
+    fflush(stdout);
     
 /*    for (int i = 0; i < mk_Targets.size(); ++i)
         printf("%3d %9.4f %3d\n", i, mk_Targets.keys()[i], mk_Targets.values()[i]);*/

@@ -917,69 +917,49 @@ QHash<int, int> k_QuantifierBase::matchTargetsToPeaks(QList<double> ak_PeakMz, Q
     if (lk_TargetMz.empty() || ak_PeakMz.empty())
         return lk_PeakForTargetMz;
     
-    int li_PeakIndex = 0;
+    int li_PeakLowIndex = 0;
+    int li_PeakHighIndex = 0;
     int li_TargetIndex = 0;
-    int li_PeakIndexNext = 0;
-    int li_TargetIndexNext = 0;
-    
-    if (lk_TargetMz[li_TargetIndex] < ak_PeakMz[li_PeakIndex])
-        li_TargetIndexNext = li_TargetIndex + 1;
-    else
-        li_PeakIndexNext = li_PeakIndex + 1;
-        
     double ld_TargetMz = lk_TargetMz[li_TargetIndex];
     double ld_Error = ld_TargetMz * (ad_MassAccuracy / 1000000.0);
     double ld_TargetMzMin = ld_TargetMz - ld_Error;
     double ld_TargetMzMax = ld_TargetMz + ld_Error;
     
-    while ((li_TargetIndex < lk_TargetMz.size()) && (li_PeakIndex < ak_PeakMz.size()))
+    while (true)
     {
-        // check if we have a match
-        if ((ak_PeakMz[li_PeakIndex] >= ld_TargetMzMin) && (ak_PeakMz[li_PeakIndex] <= ld_TargetMzMax))
+        // advance both peak pointers while we're not within the target range
+        while (ak_PeakMz[li_PeakLowIndex] < ld_TargetMzMin)
         {
-            // it's a match... but is it unambiguous?
-            // check left and right peak
-            bool lb_Unambiguous = true;
-            if (li_PeakIndex > 0)
-            {
-                if (ak_PeakMz[li_PeakIndex - 1] >= ld_TargetMzMin)
-                    lb_Unambiguous = false;
-            }
-            if (li_PeakIndex < ak_PeakMz.size() - 1)
-            {
-                if (ak_PeakMz[li_PeakIndex + 1] <= ld_TargetMzMax)
-                    lb_Unambiguous = false;
-            }
-//             printf("trying %d => %d (%s)\n", li_TargetIndex, li_PeakIndex, lb_Unambiguous ? "SUCCESS" : "FAIL");
-            if (lb_Unambiguous)
-            {
-                // yes, it's unambiguous, record the match
-                lk_PeakForTargetMz[li_TargetIndex] = li_PeakIndex;
-            }
+            ++li_PeakLowIndex;
+            li_PeakHighIndex = li_PeakLowIndex;
+            if (li_PeakLowIndex >= ak_PeakMz.size())
+                break;
         }
-        if (li_TargetIndexNext >= lk_TargetMz.size() || li_PeakIndexNext >= ak_PeakMz.size())
+        if (li_PeakLowIndex >= ak_PeakMz.size())
             break;
-        // advance whichever pointer comes next
-        if (lk_TargetMz[li_TargetIndexNext] < ak_PeakMz[li_PeakIndexNext])
+        
+        if (ak_PeakMz[li_PeakLowIndex] <= ld_TargetMzMax)
         {
-            li_TargetIndex = li_TargetIndexNext;
-            li_TargetIndexNext = li_TargetIndex + 1;
-            if (li_TargetIndex >= lk_TargetMz.size())
-                break;
-            
-            ld_TargetMz = lk_TargetMz[li_TargetIndex];
-            ld_Error = ld_TargetMz * (ad_MassAccuracy / 1000000.0);
-            ld_TargetMzMin = ld_TargetMz - ld_Error;
-            ld_TargetMzMax = ld_TargetMz + ld_Error;
+            // we're within target range now
+            // advance the peak high index as long as it's within the target range
+            while ((li_PeakHighIndex < ak_PeakMz.size() - 1) && (ak_PeakMz[li_PeakHighIndex + 1] <= ld_TargetMzMax))
+                ++li_PeakHighIndex;
+            // if there's only one peak within the target range, assign it
+            if (li_PeakLowIndex == li_PeakHighIndex)
+                lk_PeakForTargetMz[li_TargetIndex] = li_PeakLowIndex;
         }
-        else
-        {
-            li_PeakIndex = li_PeakIndexNext;
-            li_PeakIndexNext = li_PeakIndex + 1;
-            if (li_PeakIndex >= ak_PeakMz.size())
-                break;
-        }
+        
+        // advance target pointer
+        ++li_TargetIndex;
+        if (li_TargetIndex >= lk_TargetMz.size())
+            break;
+        
+        ld_TargetMz = lk_TargetMz[li_TargetIndex];
+        ld_Error = ld_TargetMz * (ad_MassAccuracy / 1000000.0);
+        ld_TargetMzMin = ld_TargetMz - ld_Error;
+        ld_TargetMzMax = ld_TargetMz + ld_Error;
     }
+    
     return lk_PeakForTargetMz;
 }
 
