@@ -45,6 +45,7 @@ void k_Quantifier::run()
     removeNonPeptides(mk_Peptides);
     
     printf("Calculating target peaks for %d peptides...", mk_Peptides.size());
+//     /*DEBUG*/printf("\n");
     fflush(stdout);
     
     // create target peaks
@@ -77,7 +78,7 @@ void k_Quantifier::run()
                 // add forbidden peak if light envelope
                 if (mb_CheckForbiddenPeak && (li_Envelope == 0))
                 {
-                    double ld_Mz = (ld_BaseMass - md_HydrogenMass + md_HydrogenMass * li_Charge) / li_Charge;
+                    double ld_Mz = (ld_BaseMass - AVERAGE_NEUTRON + md_HydrogenMass * li_Charge) / li_Charge;
                     double ld_Error = ld_Mz * (md_MassAccuracy / 1000000.0) * md_AbsenceMassAccuracyFactor;
                     double ld_MzMin = ld_Mz - ld_Error;
                     // oy, it's the forbidden peak!
@@ -87,6 +88,7 @@ void k_Quantifier::run()
                     mk_TargetMzAndIntensity[mk_Targets.size()] = tk_DoublePair(ld_Mz, 0.0);
                     mk_ForbiddenIds.insert(mk_Targets.size());
                     mk_Targets.insert(ld_MzMin, mk_Targets.size());
+//                     /*DEBUG*/printf("%9.4f %s-%d-forbidden\n", ld_Mz, ls_Peptide.toStdString().c_str(), li_Charge);
                     mk_RenderMzRangeForPeptideChargeWeight[ls_PeptideChargeWeight].first = std::min<double>(ld_Mz, mk_RenderMzRangeForPeptideChargeWeight[ls_PeptideChargeWeight].first);
                     mk_RenderMzRangeForPeptideChargeWeight[ls_PeptideChargeWeight].second = std::max<double>(ld_Mz, mk_RenderMzRangeForPeptideChargeWeight[ls_PeptideChargeWeight].second);
                 }
@@ -124,6 +126,7 @@ void k_Quantifier::run()
                         
                         mk_TargetMzAndIntensity[mk_Targets.size()] = tk_DoublePair(ld_Mz, ld_Abundance);
                         mk_Targets.insert(ld_MzMin, mk_Targets.size());
+//                         /*DEBUG*/printf("%9.4f %s-%d-%d-%d\n", ld_Mz, ls_Peptide.toStdString().c_str(), li_Charge, li_Envelope, li_PeakIndex);
                     }
                     
                     if (ld_NormalizedAbundance > 0.001)
@@ -143,7 +146,13 @@ void k_Quantifier::run()
         printf("%3d %9.4f %3d\n", i, mk_Targets.keys()[i], mk_Targets.values()[i]);*/
     
     if (mk_pCsvStream)
-        *(mk_pCsvStream.get_Pointer()) << "Filename,Scan id,Peptide,Charge,Amount light,Amount heavy,Retention time\n";
+    {
+        *(mk_pCsvStream.get_Pointer()) << "Filename,Scan id,Peptide,Charge,Amount light,Amount heavy,Retention time";
+        if (mb_UseIsotopeEnvelopes)
+            *(mk_pCsvStream.get_Pointer()) << ",Mean error light,Max error light,Mean error heavy,Max error heavy";
+        *(mk_pCsvStream.get_Pointer()) << "\n";
+    }
+    
     
     if (mk_pXhtmlStream)
     {
@@ -151,6 +160,11 @@ void k_Quantifier::run()
         lk_File.open(QIODevice::ReadOnly);
         QByteArray lk_Content = lk_File.readAll();
         *(mk_pXhtmlStream.get_Pointer()) << QString(lk_Content);
+        *(mk_pXhtmlStream.get_Pointer()) << "<tr><th>Filename</th><th>Scan</th><th>Peptide</th><th>Charge</th><th>Amount light</th><th>Amount heavy</th><th>Retention time</th>";
+        if (mb_UseIsotopeEnvelopes)
+            *(mk_pXhtmlStream.get_Pointer()) << "<th>Mean error light</th><th>Max error light</th><th>Mean error heavy</th><th>Max error heavy</th>";
+        *(mk_pXhtmlStream.get_Pointer()) << "</tr>\n";
+
         lk_File.close();
     }
     
@@ -296,7 +310,7 @@ void k_Quantifier::handleScan(r_Scan& ar_Scan, bool& ab_Continue)
             {
                 if (mk_pCsvStream)
                 {
-                    *(mk_pCsvStream.get_Pointer()) << QString("\"%1\",\"%2\",%3,%4,%5,%6,%7\n")
+                    *(mk_pCsvStream.get_Pointer()) << QString("\"%1\",\"%2\",%3,%4,%5,%6,%7")
                         .arg(ms_CurrentSpectraFile)
                         .arg(ar_Scan.ms_Id)
                         .arg(ls_Peptide)
@@ -304,27 +318,20 @@ void k_Quantifier::handleScan(r_Scan& ar_Scan, bool& ab_Continue)
                         .arg(lb_Good_[0] ? ld_Amounts_[0] : 0.0, 1, 'f', 4)
                         .arg(lb_Good_[1] ? ld_Amounts_[1] : 0.0, 1, 'f', 4)
                         .arg(ar_Scan.md_RetentionTime, 1, 'f', 2);
-                    *(mk_pCsvStream.get_Pointer()) << QString("(%1 / %2) %3 / %4\n") 
-                           .arg(ld_FitError_[0] * 100.0, 1, 'f', 1)
-                           .arg(ld_FitError_[1] * 100.0, 1, 'f', 1)
-                           .arg(ld_IndividualFitError_[0] * 100.0, 1, 'f', 1)
-                           .arg(ld_IndividualFitError_[1] * 100.0, 1, 'f', 1);
-
+                    if (mb_UseIsotopeEnvelopes)
+                    {
+                        *(mk_pCsvStream.get_Pointer()) << QString(",%1,%2,%3,%4") 
+                            .arg(ld_FitError_[0], 1, 'f', 3)
+                            .arg(ld_IndividualFitError_[0], 1, 'f', 3)
+                            .arg(ld_FitError_[1], 1, 'f', 3)
+                            .arg(ld_IndividualFitError_[1], 1, 'f', 3);
+                    }
+                    *(mk_pCsvStream.get_Pointer()) << "\n";
                 }
                 if (mk_pXhtmlStream)
                 {
                     *(mk_pXhtmlStream.get_Pointer()) << QString("\n<!-- BEGIN PEPTIDE %1 CHARGE %2 BAND %3 SCAN %4 -->\n").arg(ls_Peptide).arg(li_Charge).arg(ms_CurrentSpectraFile).arg(ar_Scan.ms_Id);
-/*                    *(mk_pXhtmlStream.get_Pointer()) << "<tr>"
-                        << "<td>" << ms_CurrentSpectraFile << "</td>"
-                        << "<td>" << ar_Scan.ms_Id << "</td>"
-                        << "<td>" << ls_Peptide << "</td>"
-                        << "<td>" << li_Charge << "</td>"
-                        << "<td>" << ld_Amounts_[0] << "</td>"
-                        << "<td>" << ld_Amounts_[1] << "</td>"
-                        << "<td>" << ar_Scan.md_RetentionTime << "</td>"
-                        << "</tr>"
-                        << endl;*/
-                    *(mk_pXhtmlStream.get_Pointer()) << QString("<tr><td>%1</td><td>%2</td><td>%3</td><td>%4</td><td>%5</td><td>%6</td><td>%7</td></tr>\n")
+                    *(mk_pXhtmlStream.get_Pointer()) << QString("<tr><td>%1</td><td>%2</td><td>%3</td><td>%4</td><td>%5</td><td>%6</td><td>%7</td>")
                         .arg(ms_CurrentSpectraFile)
                         .arg(ar_Scan.ms_Id)
                         .arg(ls_Peptide)
@@ -332,6 +339,15 @@ void k_Quantifier::handleScan(r_Scan& ar_Scan, bool& ab_Continue)
                         .arg(lb_Good_[0] ? ld_Amounts_[0] : 0.0, 1, 'f', 4)
                         .arg(lb_Good_[1] ? ld_Amounts_[1] : 0.0, 1, 'f', 4)
                         .arg(ar_Scan.md_RetentionTime, 1, 'f', 2);
+                        
+                    if (mb_UseIsotopeEnvelopes)
+                    *(mk_pXhtmlStream.get_Pointer()) << QString("<td>%1%</td><td>%2%</td><td>%3%</td><td>%4%</td>")
+                            .arg(ld_FitError_[0] * 100.0, 1, 'f', 1)
+                            .arg(ld_IndividualFitError_[0] * 100.0, 1, 'f', 1)
+                            .arg(ld_FitError_[1] * 100.0, 1, 'f', 1)
+                            .arg(ld_IndividualFitError_[1] * 100.0, 1, 'f', 1);
+                        
+                    *(mk_pXhtmlStream.get_Pointer()) << "</tr>\n";
                         
                     r_ScanQuantitationResult lr_ScanResult;
 

@@ -24,6 +24,10 @@ along with qTrace.  If not, see <http://www.gnu.org/licenses/>.
 #include <ptb/RefPtr.h>
 
 
+// AVERAGE_NEUTRON is more than questionable
+#define AVERAGE_NEUTRON 1.002
+
+
 #define DEFAULT_LABEL "15N"
 #define DEFAULT_SCAN_TYPE "all"
 #define DEFAULT_USE_ISOTOPE_ENVELOPES true
