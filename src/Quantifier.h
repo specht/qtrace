@@ -22,6 +22,8 @@ along with qTrace.  If not, see <http://www.gnu.org/licenses/>.
 #include <ptb/IsotopeEnvelope.h>
 #include "QuantifierBase.h"
 
+typedef QPair<double, double> tk_DoublePair;
+
 
 class k_Quantifier: public k_QuantifierBase
 {
@@ -37,7 +39,4 @@ protected:
     
     QStringList mk_SpectraFiles;
     QSet<QString> mk_Peptides;
-    QHash<int, double> mk_TargetIntensity;
-    QMultiMap<double, int> mk_Targets;
-    QHash<QString, r_EnvelopePeaks> mk_TargetsForPeptideChargeWeight;
 };

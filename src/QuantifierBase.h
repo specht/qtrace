@@ -31,9 +31,11 @@ along with qTrace.  If not, see <http://www.gnu.org/licenses/>.
 #define DEFAULT_MAX_CHARGE 3
 #define DEFAULT_MIN_SNR 2.0
 #define DEFAULT_MASS_ACCURACY 5.0
+#define DEFAULT_ABSENCE_MASS_ACCURACY_FACTOR 2.0
 #define DEFAULT_REQUIRE_ABUNDANCE 0.5
 #define DEFAULT_CONSIDER_ABUNDANCE 0.05
 #define DEFAULT_MAX_FIT_ERROR 0.05
+#define DEFAULT_FIXED_ISOTOPE_PEAK_COUNT 3
 #define DEFAULT_CHECK_FORBIDDEN_PEAK true
 #define DEFAULT_QUIET false
 #define DEFAULT_CSV_OUTPUT true
@@ -50,10 +52,12 @@ struct r_Parameter
         MinCharge,
         MaxCharge,
         MinSnr,
+        AbsenceMassAccuracyFactor,
         MassAccuracy,
         RequireAbundance,
         ConsiderAbundance,
         MaxFitError,
+        FixedIsotopePeakCount,
         CheckForbiddenPeak,
         Quiet,
         CsvOutput,
@@ -102,27 +106,16 @@ typedef QList<r_Scan> tk_ScanList;
 
 struct r_ScanQuantitationResult
 {
-	bool mb_IsGood;
     QString ms_Peptide;
+    int mi_Charge;
 	double md_AmountUnlabeled;
 	double md_AmountLabeled;
     double md_UnlabeledProfileScale;
     double md_LabeledProfileScale;
-	double md_Snr;
-	double md_RetentionTime;
-	QList<double> mk_TargetMz;
-	QList<double> mk_ForbiddenMz;
 	double md_MinMz;
 	double md_MaxMz;
-	int mi_Charge;
-	QString ms_ScanId;
-	QList<r_Peak> mk_UnlabeledPeaks;
-	QList<r_Peak> mk_LabeledPeaks;
-    double md_UnlabeledError;
-    double md_LabeledError;
-	
-	// scan data
-	QString ms_ScanHashKey;
+    bool mb_UnlabeledGood;
+    bool mb_LabeledGood;
 };
 
 
@@ -141,7 +134,6 @@ struct r_Bucket
 		
 
 // peptide => scan results
-typedef QHash<QString, QList<r_ScanQuantitationResult> > tk_SpotResults;
 typedef QPair<double, double> tk_DoublePair;
 typedef QHash<QString, double> tk_StringDoubleHash;
 
@@ -154,12 +146,12 @@ public:
 	
 	virtual void progressFunction(QString as_ScanId, bool ab_InterestingScan);
 	
-	virtual QString renderScanAsSvg(r_Scan& ar_Scan, r_ScanQuantitationResult ar_QuantitationResult);
+	virtual QString renderScanAsSvg(r_Scan& ar_Scan, r_ScanQuantitationResult ar_QuantitationResult, QList<r_Peak>& ak_AllPeaks, QHash<int, int>& ak_Matches);
     QHash<QString, int> compositionForPeptide(const QString& as_Peptide);
-    void leastSquaresFit(QList<tk_DoublePair> ak_Pairs, double* ad_Factor_, double* ad_Error_);
+    void leastSquaresFit(QList<tk_DoublePair> ak_Pairs, double* ad_Factor_, double* ad_Error_, double* ad_IndividualError_);
     
     // parallel mass matching, attention: both lists must be sorted!
-    QHash<int, int> matchTargetsToPeaks(QList<double> ak_PeakMz, QMultiMap<double, int> ak_Targets, double ad_MassAccuracy);
+    QHash<int, int> matchTargetsToPeaks(QList<double> ak_PeakMz, QMultiMap<double, int> ak_TargetMzMin, QHash<int, tk_DoublePair> ak_TargetMzAndIntensity, QSet<int> ak_ForbiddenIds);
     QHash<int, int> extractMatches(QSet<int> ak_Ids, QList<int> ak_TargetIdsSorted, QHash<int, int> ak_Matches);
     virtual void calculateMeanAndStandardDeviation(QList<double> ak_Values, double* ad_Mean_, double* ad_StandardDeviation_);
     
@@ -181,6 +173,7 @@ protected:
     QVariant::Type peekNextToken(QStringList ak_StringList);
     tk_IsotopeEnvelope lightEnvelopeForPeptide(QString as_Peptide);
     tk_IsotopeEnvelope heavyEnvelopeForPeptide(QString as_Peptide);
+    int heavyMassShiftForPeptide(QString as_Peptide);
 
     // general information
     QSet<r_Parameter::Enumeration> mk_Parameters;
@@ -194,9 +187,11 @@ protected:
 	int mi_MaxCharge;
 	double md_MinSnr;
 	double md_MassAccuracy;
+    double md_AbsenceMassAccuracyFactor;
     double md_RequireAbundance;
     double md_ConsiderAbundance;
     double md_MaxFitError;
+    int mi_FixedIsotopePeakCount;
     bool mb_CheckForbiddenPeak;
 	bool mb_Quiet;
     bool mb_LogScale;
@@ -220,7 +215,25 @@ protected:
 
     // natural isotope envelope generator
     k_IsotopeEnvelope mk_IsotopeEnvelope;
+    
     // this hash contains a heavy isotope generator for every labeled amino acid
     QHash<QString, k_IsotopeEnvelope> mk_HeavyIsotopeEnvelopeForAminoAcid;
+    
+    // this hash contains a mass shift for every labeled amino acid
+    QHash<QString, int> mk_HeavyMassShiftForAminoAcid;
+    
     QHash<QString, tk_ArtificialEnvironment> mk_Label;
+    QHash<QString, tk_DoublePair> mk_RenderMzRangeForPeptideChargeWeight;
+    QHash<QString, tk_IsotopeEnvelope> mk_RenderIsotopeEnvelopeForPeptideWeight;
+    QHash<QString, double> mk_RenderBaseMassForPeptide;
+    
+    QHash<int, tk_DoublePair> mk_TargetMzAndIntensity;
+    
+    // mk_Targets is a map of target min mass => target id
+    // This way, we can handle multiple mass accuracies (peak presence/absence)
+    // in one go. The actual m/z for a certain id are stored in mk_TargetMzAndIntensity.
+    QMultiMap<double, int> mk_Targets;
+    
+    QHash<QString, r_EnvelopePeaks> mk_TargetsForPeptideChargeWeight;
+    QSet<int> mk_ForbiddenIds;
 };

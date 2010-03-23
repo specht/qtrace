@@ -43,3 +43,4 @@ HEADERS += \
 
 SOURCES += \
     ../../src/QuantifierBase.cpp \
+    ../../src/Tango.cpp \

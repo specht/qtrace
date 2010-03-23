@@ -1,5 +1,8 @@
 #pragma once
 
+#include <QtCore>
+
+
 #define TANGO_BUTTER_0 "#fce94f"
 #define TANGO_BUTTER_1 "#edd400"
 #define TANGO_BUTTER_2 "#c4a000"
@@ -34,3 +37,9 @@
 #define TANGO_ALUMINIUM_3 "#888a85"
 #define TANGO_ALUMINIUM_4 "#555753"
 #define TANGO_ALUMINIUM_5 "#2e3436"
+
+#define TANGO_WHITE "#ffffff"
+#define TANGO_BLACK "#000000"
+
+
+QString tangoMix(const QString& a, const QString& b, unsigned char auc_Factor);

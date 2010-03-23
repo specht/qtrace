@@ -24,8 +24,6 @@ along with qTrace.  If not, see <http://www.gnu.org/licenses/>.
 #include <limits>
 #include "Tango.h"
 
-#define ABSENCE_MASS_ACCURACY_FACTOR 2.0
-
 
 extern QString gs_Version;
 
@@ -41,9 +39,11 @@ k_QuantifierBase::k_QuantifierBase(QStringList& ak_Arguments, QSet<r_Parameter::
 	, mi_MaxCharge(DEFAULT_MAX_CHARGE)
 	, md_MinSnr(DEFAULT_MIN_SNR)
 	, md_MassAccuracy(DEFAULT_MASS_ACCURACY)
+	, md_AbsenceMassAccuracyFactor(DEFAULT_ABSENCE_MASS_ACCURACY_FACTOR)
     , md_RequireAbundance(DEFAULT_REQUIRE_ABUNDANCE)
     , md_ConsiderAbundance(DEFAULT_CONSIDER_ABUNDANCE)
     , md_MaxFitError(DEFAULT_MAX_FIT_ERROR)
+    , mi_FixedIsotopePeakCount(DEFAULT_FIXED_ISOTOPE_PEAK_COUNT)
 	, mb_CheckForbiddenPeak(DEFAULT_CHECK_FORBIDDEN_PEAK)
 	, mb_Quiet(DEFAULT_QUIET)
     , mb_LogScale(DEFAULT_LOG_SCALE)
@@ -78,6 +78,11 @@ k_QuantifierBase::k_QuantifierBase(QStringList& ak_Arguments, QSet<r_Parameter::
 		printf("Error: mass accuracy must not be less than zero.\n");
 		exit(1);
 	}
+	if (md_AbsenceMassAccuracyFactor < 0.0)
+    {
+        printf("Error: absence mass accuracy factor must not be less than zero.\n");
+        exit(1);
+    }
     if (md_RequireAbundance < 0.0 || md_RequireAbundance > 1.0)
     {
         printf("Error: require abundance out of range (0.0 - 1.0).\n");
@@ -93,8 +98,18 @@ k_QuantifierBase::k_QuantifierBase(QStringList& ak_Arguments, QSet<r_Parameter::
         printf("Error: consider abundance must not be greater than require abundance.\n");
         exit(1);
     }
-	
-	QFile lk_File(":ext/proteomics-knowledge-base/amino-acids.csv");
+    if (md_MaxFitError < 0.0)
+    {
+        printf("Error: max fit error must not be less than zero.\n");
+        exit(1);
+    }
+    if (mi_FixedIsotopePeakCount < 1)
+    {
+        printf("Error: Fixed isotope peak count must not be less than 1.\n");
+        exit(1);
+    }
+
+    QFile lk_File(":ext/proteomics-knowledge-base/amino-acids.csv");
 	if (!lk_File.open(QFile::ReadOnly))
     {
         fprintf(stderr, "Error: Unable to open amino-acids.csv.\n");
@@ -168,18 +183,6 @@ k_QuantifierBase::k_QuantifierBase(QStringList& ak_Arguments, QSet<r_Parameter::
 
 k_QuantifierBase::~k_QuantifierBase()
 {
-}
-
-
-bool compareScanQuantitationBySnr(const r_ScanQuantitationResult& a, const r_ScanQuantitationResult& b)
-{
-	return a.md_Snr > b.md_Snr;
-}
-
-
-bool compareScanQuantitationByRetentionTime(const r_ScanQuantitationResult& a, const r_ScanQuantitationResult& b)
-{
-	return a.md_RetentionTime < b.md_RetentionTime;
 }
 
 
@@ -280,12 +283,16 @@ void k_QuantifierBase::parseArguments(QStringList& ak_Arguments)
             md_MinSnr = stringToDouble(ak_Arguments.takeFirst());
         else if (mk_Parameters.contains(r_Parameter::MassAccuracy) && ls_Key == "--massAccuracy")
             md_MassAccuracy = stringToDouble(ak_Arguments.takeFirst());
+        else if (mk_Parameters.contains(r_Parameter::MassAccuracy) && ls_Key == "--absenceMassAccuracyFactor")
+            md_AbsenceMassAccuracyFactor = stringToDouble(ak_Arguments.takeFirst());
         else if (mk_Parameters.contains(r_Parameter::RequireAbundance) && ls_Key == "--requireAbundance")
             md_RequireAbundance = stringToDouble(ak_Arguments.takeFirst());
         else if (mk_Parameters.contains(r_Parameter::ConsiderAbundance) && ls_Key == "--considerAbundance")
             md_ConsiderAbundance = stringToDouble(ak_Arguments.takeFirst());
         else if (mk_Parameters.contains(r_Parameter::MaxFitError) && ls_Key == "--maxFitError")
             md_MaxFitError = stringToDouble(ak_Arguments.takeFirst());
+        else if (mk_Parameters.contains(r_Parameter::MaxFitError) && ls_Key == "--isotopePeaks")
+            mi_FixedIsotopePeakCount = stringToInt(ak_Arguments.takeFirst());
         else if (mk_Parameters.contains(r_Parameter::CheckForbiddenPeak) && ls_Key == "--checkForbiddenPeak")
             mb_CheckForbiddenPeak = stringToBool(ak_Arguments.takeFirst());
         else if (mk_Parameters.contains(r_Parameter::Quiet) && ls_Key == "--quiet")
@@ -356,14 +363,12 @@ double k_QuantifierBase::calculatePeptideMass(QString as_Peptide, int ai_Charge)
 	double ld_Mass = md_WaterMass;
 	for (int i = 0; i < as_Peptide.length(); ++i)
 		ld_Mass += mk_AminoAcidWeight[as_Peptide.at(i).toAscii()];
-	// UNSURE ABOUT THIS VALUE BUT OK WITH BIANCAS EXAMPLES, should be 1.0078250
 	return (ld_Mass + md_HydrogenMass * ai_Charge) / ai_Charge;
 }
 
 
-QString k_QuantifierBase::renderScanAsSvg(r_Scan& ar_Scan, r_ScanQuantitationResult ar_QuantitationResult)
+QString k_QuantifierBase::renderScanAsSvg(r_Scan& ar_Scan, r_ScanQuantitationResult ar_QuantitationResult, QList<r_Peak>& ak_AllPeaks, QHash<int, int>& ak_Matches)
 {
-    /*
 	double ld_Ratio = 4.0;
 	double ld_Width = 950.0;
 	double ld_Height = ld_Width / ld_Ratio;
@@ -405,16 +410,45 @@ QString k_QuantifierBase::renderScanAsSvg(r_Scan& ar_Scan, r_ScanQuantitationRes
 	double xmax = ar_Scan.mr_Spectrum.md_MzValues_[li_End];
 	xmin = ar_QuantitationResult.md_MinMz;
 	xmax = ar_QuantitationResult.md_MaxMz;
-	double ymax = ar_Scan.mr_Spectrum.md_IntensityValues_[li_Start];
-	for (int i = li_Start + 1; i <= li_End; ++i)
-		ymax = std::max<double>(ymax, ar_Scan.mr_Spectrum.md_IntensityValues_[i]);
+	double ymax = 0.0;
+    if (ar_QuantitationResult.md_UnlabeledProfileScale > 0.0)
+    {
+        tk_IsotopeEnvelope lk_IsotopeEnvelope = mk_RenderIsotopeEnvelopeForPeptideWeight[ar_QuantitationResult.ms_Peptide + "-0"];
+        for (int i = 0; i < lk_IsotopeEnvelope.size(); ++i)
+        {
+            double ld_Abundance = lk_IsotopeEnvelope[i].first * ar_QuantitationResult.md_UnlabeledProfileScale;
+            ymax = std::max<double>(ymax, ld_Abundance);
+        }
+    }
+    if (ar_QuantitationResult.md_LabeledProfileScale > 0.0)
+    {
+        tk_IsotopeEnvelope lk_IsotopeEnvelope = mk_RenderIsotopeEnvelopeForPeptideWeight[ar_QuantitationResult.ms_Peptide + "-1"];
+        for (int i = 0; i < lk_IsotopeEnvelope.size(); ++i)
+        {
+            double ld_Abundance = lk_IsotopeEnvelope[i].first * ar_QuantitationResult.md_LabeledProfileScale;
+            ymax = std::max<double>(ymax, ld_Abundance);
+        }
+    }
+    for (int li_Weight = 0; li_Weight < 2; ++li_Weight)
+    {
+        QString ls_Key = QString("%1-%2-%3").arg(ar_QuantitationResult.ms_Peptide).arg(ar_QuantitationResult.mi_Charge).arg(li_Weight);
+        r_EnvelopePeaks lr_Peaks = mk_TargetsForPeptideChargeWeight[ls_Key];
+        foreach (int li_Id, lr_Peaks.mk_RequiredIds | lr_Peaks.mk_ConsideredIds)
+        {
+            if (ak_Matches.contains(li_Id))
+            {
+                r_Peak& lr_Peak = ak_AllPeaks[ak_Matches[li_Id]];
+                ymax = std::max<double>(ymax, lr_Peak.md_PeakIntensity);
+            }
+        }
+    }
+    
+    // add a little space above
+    ymax *= 1.1;
+            
 	// ymax remains unscaled!
 	double ymaxScaled = this->scale(1.0);
     
-    double ymaxUnlabeled = 0.0;
-    foreach (r_Peak lr_Peak, ar_QuantitationResult.mk_UnlabeledPeaks)
-        ymaxUnlabeled = std::max<double>(ymaxUnlabeled, lr_Peak.md_PeakIntensity / ymax);
-	
 	QBuffer lk_Buffer;
 	lk_Buffer.open(QBuffer::WriteOnly);
 
@@ -453,87 +487,103 @@ QString k_QuantifierBase::renderScanAsSvg(r_Scan& ar_Scan, r_ScanQuantitationRes
         
         QString ls_Peptide = ar_QuantitationResult.ms_Peptide;
         int li_Charge = ar_QuantitationResult.mi_Charge;
-        QString ls_PeptideChargeKey = QString("%1-%2").arg(ls_Peptide).arg(li_Charge);
 
         tk_IsotopeEnvelope lk_IsotopeEnvelope;
         bool lb_DrawnOnePoint;
         double ld_LastMz;
         
-        lk_IsotopeEnvelope = mk_UnlabeledIsotopeEnvelopeForPeptideCharge[ls_PeptideChargeKey];
-        double ld_PeptideChargeBaseMz = calculatePeptideMass(ls_Peptide, li_Charge);
-        lb_DrawnOnePoint = false;
-        ld_LastMz = 0.0;
-        QPainterPath lk_Path;
-        for (int i = 0; i < lk_IsotopeEnvelope.size(); ++i)
+        double ld_PeptideBaseMass = mk_RenderBaseMassForPeptide[ls_Peptide];
+        
+        if (mb_UseIsotopeEnvelopes)
         {
-            double ld_Abundance = lk_IsotopeEnvelope[i].first * ar_QuantitationResult.md_UnlabeledProfileScale;
-            double ld_Mz = lk_IsotopeEnvelope[i].second / li_Charge;
-            ld_Mz += ld_PeptideChargeBaseMz;
-            double x = (ld_Mz - xmin) * dx + x0;
-            double y = this->scale(ld_Abundance / ymax) / ymaxScaled;
-            if (y > 0.001)
+            if (ar_QuantitationResult.md_UnlabeledProfileScale > 0.0)
             {
-                y = y * dy + y0;
-                if (!lb_DrawnOnePoint)
+                lk_IsotopeEnvelope = mk_RenderIsotopeEnvelopeForPeptideWeight[ls_Peptide + "-0"];
+                
+                lb_DrawnOnePoint = false;
+                ld_LastMz = 0.0;
+                QPainterPath lk_Path;
+                for (int i = 0; i < lk_IsotopeEnvelope.size(); ++i)
                 {
-                    lk_Path.moveTo(QPointF(((ld_Mz - 0.5 / li_Charge) - xmin) * dx + x0, y0));
-                    lb_DrawnOnePoint = true;
-                    //lk_Path.quadTo(QPointF(((ld_Mz / li_Charge) - xmin) * dx + x0, y0), QPointF(x, y));
+                    double ld_Abundance = lk_IsotopeEnvelope[i].first * ar_QuantitationResult.md_UnlabeledProfileScale;
+                    double ld_Mz = (ld_PeptideBaseMass + lk_IsotopeEnvelope[i].second + md_HydrogenMass * li_Charge) / li_Charge;
+                    double x = (ld_Mz - xmin) * dx + x0;
+                    double y = this->scale(ld_Abundance / ymax) / ymaxScaled;
+                    if (y > 0.001)
+                    {
+                        y = y * dy + y0;
+                        if (!lb_DrawnOnePoint)
+                        {
+                            lk_Path.moveTo(QPointF(((ld_Mz - 0.5 / li_Charge) - xmin) * dx + x0, y0));
+                            lb_DrawnOnePoint = true;
+                        }
+                        lk_Path.lineTo(QPointF(x, y));
+                        ld_LastMz = ld_Mz;
+                    }
+                }
+                lk_Path.lineTo(QPointF(((ld_LastMz + 0.5 / li_Charge) - xmin) * dx + x0, y0));
+                lk_Pen.setWidthF(1.0);
+                lk_Pen.setJoinStyle(Qt::BevelJoin);
+                lk_Pen.setColor(QColor(TANGO_ALUMINIUM_3));
+                if (ar_QuantitationResult.mb_UnlabeledGood)
+                {
+                    lk_Pen.setStyle(Qt::SolidLine);
+                    lk_Painter.setBrush(QBrush(QColor(TANGO_ALUMINIUM_0)));
                 }
                 else
                 {
-                    //lk_Path.lineTo(QPointF(x, y));
+                    lk_Pen.setStyle(Qt::DashLine);
+                    lk_Painter.setBrush(Qt::NoBrush);
                 }
-                lk_Path.lineTo(QPointF(x, y));
-                ld_LastMz = ld_Mz;
+                lk_Painter.setPen(lk_Pen);
+                
+                lk_Painter.drawPath(lk_Path);
             }
-        }
-        lk_Path.lineTo(QPointF(((ld_LastMz + 0.5 / li_Charge) - xmin) * dx + x0, y0));
-        lk_Pen.setWidthF(1.0);
-        lk_Pen.setJoinStyle(Qt::BevelJoin);
-        lk_Pen.setColor(QColor(128, 128, 128));
-        lk_Painter.setPen(lk_Pen);
-        lk_Painter.setBrush(QBrush(QColor(224, 224, 224, 128)));
-        
-        lk_Painter.drawPath(lk_Path);
-		
-        lk_IsotopeEnvelope = mk_LabeledIsotopeEnvelopeForPeptideCharge[ls_PeptideChargeKey];
-        lb_DrawnOnePoint = false;
-        ld_LastMz = 0.0;
-        lk_Path = QPainterPath();
-        for (int i = 0; i < lk_IsotopeEnvelope.size(); ++i)
-        {
-            double ld_Abundance = lk_IsotopeEnvelope[i].first * ar_QuantitationResult.md_LabeledProfileScale;
-            double ld_Mz = lk_IsotopeEnvelope[i].second / li_Charge;
-            ld_Mz += ld_PeptideChargeBaseMz;
-            double x = (ld_Mz - xmin) * dx + x0;
-            double y = this->scale(ld_Abundance / ymax) / ymaxScaled;
-            if (y > 0.001)
+            
+            if (ar_QuantitationResult.md_LabeledProfileScale > 0.0)
             {
-                y = y * dy + y0;
-                if (!lb_DrawnOnePoint)
+                lk_IsotopeEnvelope = mk_RenderIsotopeEnvelopeForPeptideWeight[ls_Peptide + "-1"];
+                lb_DrawnOnePoint = false;
+                ld_LastMz = 0.0;
+                QPainterPath lk_Path;
+                for (int i = 0; i < lk_IsotopeEnvelope.size(); ++i)
                 {
-                    lk_Path.moveTo(QPointF(((ld_Mz - 0.5 / li_Charge) - xmin) * dx + x0, y0));
-                    lb_DrawnOnePoint = true;
-                    //lk_Path.quadTo(QPointF(((ld_Mz / li_Charge) - xmin) * dx + x0, y0), QPointF(x, y));
+                    double ld_Abundance = lk_IsotopeEnvelope[i].first * ar_QuantitationResult.md_LabeledProfileScale;
+                    double ld_Mz = (ld_PeptideBaseMass + lk_IsotopeEnvelope[i].second + md_HydrogenMass * li_Charge) / li_Charge;
+                    double x = (ld_Mz - xmin) * dx + x0;
+                    double y = this->scale(ld_Abundance / ymax) / ymaxScaled;
+                    if (y > 0.001)
+                    {
+                        y = y * dy + y0;
+                        if (!lb_DrawnOnePoint)
+                        {
+                            lk_Path.moveTo(QPointF(((ld_Mz - 0.5 / li_Charge) - xmin) * dx + x0, y0));
+                            lb_DrawnOnePoint = true;
+                        }
+                        lk_Path.lineTo(QPointF(x, y));
+                        ld_LastMz = ld_Mz;
+                    }
+                }
+                lk_Path.lineTo(QPointF(((ld_LastMz + 0.5 / li_Charge) - xmin) * dx + x0, y0));
+                lk_Pen.setWidthF(1.0);
+                lk_Pen.setJoinStyle(Qt::BevelJoin);
+                lk_Pen.setColor(QColor(TANGO_ALUMINIUM_3));
+                if (ar_QuantitationResult.mb_LabeledGood)
+                {
+                    lk_Pen.setStyle(Qt::SolidLine);
+                    lk_Painter.setBrush(QBrush(QColor(TANGO_ALUMINIUM_0)));
                 }
                 else
                 {
-                    //lk_Path.lineTo(QPointF(x, y));
+                    lk_Pen.setStyle(Qt::DashLine);
+                    lk_Painter.setBrush(Qt::NoBrush);
                 }
-                lk_Path.lineTo(QPointF(x, y));
-                ld_LastMz = ld_Mz;
+                lk_Painter.setPen(lk_Pen);
+                
+                lk_Painter.drawPath(lk_Path);
             }
         }
-        lk_Path.lineTo(QPointF(((ld_LastMz + 0.5 / li_Charge) - xmin) * dx + x0, y0));
-        lk_Pen.setWidthF(1.0);
-        lk_Pen.setJoinStyle(Qt::BevelJoin);
-        lk_Pen.setColor(QColor(128, 128, 128));
-        lk_Painter.setPen(lk_Pen);
-        lk_Painter.setBrush(QBrush(QColor(224, 224, 224, 128)));
-        
-        lk_Painter.drawPath(lk_Path);
-        
+
         lk_Painter.setBrush(Qt::NoBrush);
 		// draw spectrum
 		lk_Pen.setWidthF(1.0);
@@ -541,23 +591,7 @@ QString k_QuantifierBase::renderScanAsSvg(r_Scan& ar_Scan, r_ScanQuantitationRes
 		lk_Pen.setColor(QColor(TANGO_CHAMELEON_2));
 		lk_Pen.setStyle(Qt::DashLine);
 		lk_Painter.setPen(lk_Pen);
-		
-		// draw target m/z lines
-		foreach (double ld_Mz, ar_QuantitationResult.mk_TargetMz)
-		{
-			double x = (ld_Mz - xmin) * dx + x0;
-			lk_Painter.drawLine(QPointF(x, y0), QPointF(x, y0 + dy));
-		}
-		
-		lk_Pen.setColor(QColor(TANGO_SCARLET_RED_1));
-		lk_Painter.setPen(lk_Pen);
-		// draw forbidden m/z lines
-		foreach (double ld_Mz, ar_QuantitationResult.mk_ForbiddenMz)
-		{
-			double x = (ld_Mz - xmin) * dx + x0;
-			lk_Painter.drawLine(QPointF(x, y0), QPointF(x, y0 + dy));
-		}
-		
+        
 		lk_Pen.setColor(QColor(192, 192, 192));
 		lk_Painter.setPen(lk_Pen);
 		
@@ -572,7 +606,7 @@ QString k_QuantifierBase::renderScanAsSvg(r_Scan& ar_Scan, r_ScanQuantitationRes
 		
 		lk_Pen.setWidthF(1.0);
 		lk_Pen.setJoinStyle(Qt::RoundJoin);
-		lk_Pen.setColor(QColor(128, 128, 128));
+		lk_Pen.setColor(QColor(192, 192, 192));
 		lk_Pen.setStyle(Qt::SolidLine);
 		lk_Painter.setPen(lk_Pen);
 		
@@ -582,64 +616,68 @@ QString k_QuantifierBase::renderScanAsSvg(r_Scan& ar_Scan, r_ScanQuantitationRes
 									this->scale(ar_Scan.mr_Spectrum.md_IntensityValues_[i] / ymax) / ymaxScaled * dy + y0));
 		lk_Painter.drawPolyline(QPolygonF(lk_Points));
 		
-		foreach (r_Peak lr_Peak, ar_QuantitationResult.mk_UnlabeledPeaks)
-		{
-			// draw Gaussian
-			lk_Pen.setWidthF(1.0);
-			lk_Pen.setJoinStyle(Qt::RoundJoin);
-			lk_Pen.setColor(QColor(ar_QuantitationResult.md_UnlabeledError <= md_MaxFitError ? TANGO_SKY_BLUE_1 : TANGO_SCARLET_RED_1));
-			lk_Pen.setStyle(Qt::SolidLine);
-			lk_Painter.setPen(lk_Pen);
-			
-			QVector<QPointF> lk_Points;
-			double w = sqrt(lr_Peak.md_GaussC) / 2.0;
-			for (double x = lr_Peak.md_PeakMz - w; x <= lr_Peak.md_PeakMz + w; x += w * 0.05)
-				lk_Points.append(QPointF((x - xmin) * dx + x0, 
-										this->scale(gaussian(x, lr_Peak.md_GaussA, lr_Peak.md_GaussB, lr_Peak.md_GaussC) / ymax) / ymaxScaled * dy + y0));
-			lk_Painter.drawPolyline(QPolygonF(lk_Points));
-		}
+        lk_Pen.setWidthF(1.0);
+        lk_Pen.setJoinStyle(Qt::RoundJoin);
+        lk_Pen.setColor(QColor(TANGO_CHAMELEON_2));
+        lk_Pen.setStyle(Qt::SolidLine);
+        lk_Painter.setPen(lk_Pen);
         
-        foreach (r_Peak lr_Peak, ar_QuantitationResult.mk_LabeledPeaks)
+        for (int li_Weight = 0; li_Weight < 2; ++li_Weight)
         {
-            // draw Gaussian
-            lk_Pen.setWidthF(1.0);
-            lk_Pen.setJoinStyle(Qt::RoundJoin);
-            lk_Pen.setColor(QColor(ar_QuantitationResult.md_LabeledError <= md_MaxFitError ? TANGO_SKY_BLUE_1 : TANGO_SCARLET_RED_1));
-            lk_Pen.setStyle(Qt::SolidLine);
-            lk_Painter.setPen(lk_Pen);
-            
-            QVector<QPointF> lk_Points;
-            double w = sqrt(lr_Peak.md_GaussC) / 2.0;
-            for (double x = lr_Peak.md_PeakMz - w; x <= lr_Peak.md_PeakMz + w; x += w * 0.05)
-                lk_Points.append(QPointF((x - xmin) * dx + x0, 
-                                        this->scale(gaussian(x, lr_Peak.md_GaussA, lr_Peak.md_GaussB, lr_Peak.md_GaussC) / ymax) / ymaxScaled * dy + y0));
-            lk_Painter.drawPolyline(QPolygonF(lk_Points));
+            QString ls_Key = QString("%1-%2-%3").arg(ar_QuantitationResult.ms_Peptide).arg(ar_QuantitationResult.mi_Charge).arg(li_Weight);
+            r_EnvelopePeaks lr_Peaks = mk_TargetsForPeptideChargeWeight[ls_Key];
+            foreach (int li_Id, lr_Peaks.mk_RequiredIds | lr_Peaks.mk_ConsideredIds)
+            {
+                if (ak_Matches.contains(li_Id))
+                {
+                    if (lr_Peaks.mk_RequiredIds.contains(li_Id))
+                        lk_Pen.setStyle(Qt::SolidLine);
+                    else
+                        lk_Pen.setStyle(Qt::DotLine);
+                    lk_Pen.setColor(QColor(TANGO_SKY_BLUE_1));
+                    lk_Painter.setPen(lk_Pen);
+                    
+                    r_Peak& lr_Peak = ak_AllPeaks[ak_Matches[li_Id]];
+                    double x = (lr_Peak.md_PeakMz - xmin) * dx + x0;
+                    double y = this->scale(lr_Peak.md_PeakIntensity / ymax) / ymaxScaled * dy + y0;
+                    lk_Painter.drawLine(QPointF(x, y0), QPointF(x, y));
+                    lk_Painter.drawArc(QRectF(QPointF(x, y) - QPointF(3.0, 3.0), QSize(6.0, 6.0)), 0, 5760);
+                }
+                else
+                {
+                    if (lr_Peaks.mk_RequiredIds.contains(li_Id))
+                    {
+                        lk_Pen.setStyle(Qt::SolidLine);
+                        lk_Pen.setColor(QColor(TANGO_SCARLET_RED_2));
+                        lk_Painter.setPen(lk_Pen);
+                        
+                        double x = (mk_TargetMzAndIntensity[li_Id].first - xmin) * dx + x0;
+                        lk_Painter.drawLine(QPointF(x, y0), QPointF(x, y0 + dy));
+                    }
+                }
+            }
         }
+        
 	}
 	lk_Buffer.close();
 	lk_Buffer.open(QBuffer::ReadOnly);
 	lk_Buffer.seek(0);
 	QString ls_Result = QString(lk_Buffer.readAll());
 	lk_Buffer.close();
-	foreach (r_Peak lr_Peak, (ar_QuantitationResult.mk_UnlabeledPeaks + ar_QuantitationResult.mk_LabeledPeaks))
+/*	foreach (r_Peak lr_Peak, (ar_QuantitationResult.mk_UnlabeledPeaks + ar_QuantitationResult.mk_LabeledPeaks))
 	{
 		double ld_X, ld_Y;
 		ld_X = (lr_Peak.md_PeakMz - xmin) * dx + x0;
 		ld_Y = this->scale(lr_Peak.md_PeakIntensity / ymax) / ymaxScaled * dy + y0;
 		char lc_Number_[1024];
         lc_Number_[0] = 0;
-//         if (me_AmountEstimation == r_AmountEstimation::Area)
-//             sprintf(lc_Number_, "%.2g", lr_Peak.md_PeakArea);
-//         else if (me_AmountEstimation == r_AmountEstimation::Intensity)
         // :TODO: now this always uses peak height, make this an option (area/intensity)
         sprintf(lc_Number_, "%.2g", lr_Peak.md_PeakIntensity);
         if (strlen(lc_Number_) > 0)
             ls_Labels += QString("<text x='%1' y='%2' style='font-size:10px; font-family:Verdana; fill: #aaa;' transform='rotate(90 %1 %2)'>%3</text>\n").arg(ld_X + 3.0).arg(ld_Y + 3.0).arg(lc_Number_);
-	}
+	}*/
 	ls_Result.replace("</svg>", ls_Labels + "</svg>");
 	return ls_Result;
-    */
-    return QString();
 }
 
 
@@ -721,6 +759,13 @@ void k_QuantifierBase::printUsageAndExit()
         printf("  --massAccuracy (ppm) <float> (default: %1.1f)\n", DEFAULT_MASS_ACCURACY);
         printf("      This mass accuracy is used to check for the presence of peaks.\n");
     }
+    if (mk_Parameters.contains(r_Parameter::AbsenceMassAccuracyFactor))
+    {
+        printf("  --absenceMassAccuracyFactor <float> (default: %1.1f)\n", DEFAULT_ABSENCE_MASS_ACCURACY_FACTOR);
+        printf("      For the forbidden peak, a higher mass accuracy may be specified\n");
+        printf("      this factor. The specified mass accuracy is multiplied with this factor\n");
+        printf("      when checking for peak absence.\n");
+    }
     if (mk_Parameters.contains(r_Parameter::RequireAbundance))
     {
         printf("  --requireAbundance <float> (default: %1.1f)\n", DEFAULT_REQUIRE_ABUNDANCE);
@@ -735,6 +780,12 @@ void k_QuantifierBase::printUsageAndExit()
     {
         printf("  --maxFitError <float> (default: %1.2f)\n", DEFAULT_MAX_FIT_ERROR);
         printf("      Specify the maximum error allowed when fitting isotope envelopes.\n");
+    }
+    if (mk_Parameters.contains(r_Parameter::FixedIsotopePeakCount))
+    {
+        printf("  --isotopePeaks <float> (default: %d)\n", DEFAULT_FIXED_ISOTOPE_PEAK_COUNT);
+        printf("      Specify how many isotope peaks should be added for amount estimation,\n");
+        printf("      if --useIsotopeEnvelopes is set to 'no'.\n");
     }
     if (mk_Parameters.contains(r_Parameter::CheckForbiddenPeak))
     {
@@ -868,7 +919,9 @@ QHash<QString, int> k_QuantifierBase::compositionForPeptide(const QString& as_Pe
 }
 
 
-void k_QuantifierBase::leastSquaresFit(QList<tk_DoublePair> ak_Pairs, double* ad_Factor_, double* ad_Error_)
+void k_QuantifierBase::leastSquaresFit(QList<tk_DoublePair> ak_Pairs, double* ad_Factor_, 
+                                       double* ad_Error_,
+                                       double* ad_IndividualError_)
 {
     double f = 0.0;
     double e = 0.0;
@@ -886,78 +939,84 @@ void k_QuantifierBase::leastSquaresFit(QList<tk_DoublePair> ak_Pairs, double* ad
         ld_MaxTargetIntensity = std::max<double>(ld_MaxTargetIntensity, lk_Pair.first);
     
     double ld_Error = 0.0;
+    double ld_IndividualError = 0.0;
 
     for (int i = 0; i < ak_Pairs.size(); ++i)
     {
         tk_DoublePair lk_Pair = ak_Pairs[i];
         double ld_TargetHeight = lk_Pair.first;
         double ld_PeakHeight = lk_Pair.second;
+        
+        // multiply peaks with fit factor
         ld_PeakHeight /= f;
+
+        // normalize so that max target intensity is 1.0
         ld_TargetHeight /= ld_MaxTargetIntensity;
         ld_PeakHeight /= ld_MaxTargetIntensity;
-        ld_Error += pow(ld_PeakHeight - ld_TargetHeight, 2.0);
+        
+        double ld_ThisError = fabs(ld_PeakHeight - ld_TargetHeight);
+        ld_IndividualError = std::max<double>(ld_IndividualError, ld_ThisError);
+        ld_Error += ld_ThisError;
     }
     ld_Error /= ak_Pairs.size();
     
     *ad_Error_ = ld_Error;
+    *ad_IndividualError_ = ld_IndividualError;
 }
 
 
-QHash<int, int> k_QuantifierBase::matchTargetsToPeaks(QList<double> ak_PeakMz, QMultiMap<double, int> ak_Targets, double ad_MassAccuracy)
+QHash<int, int> k_QuantifierBase::matchTargetsToPeaks(QList<double> ak_PeakMz, QMultiMap<double, int> ak_TargetMzMin, QHash<int, tk_DoublePair> ak_TargetMzAndIntensity, QSet<int> ak_ForbiddenIds)
 {
     // match all target m/z values simultaneously to this spectrum's peaks
     // create root bucket
-    QList<double> lk_TargetMz = ak_Targets.keys();
-    QList<int> lk_TargetIds = ak_Targets.values();
+    QList<double> lk_TargetMzMin = ak_TargetMzMin.keys();
+    QList<int> lk_TargetIds = ak_TargetMzMin.values();
     
-    // after parallel searching, this list will contain for 
+    // after the search, this list will contain for 
     // each target m/z value the peak which is closest to it
     QHash<int, int> lk_PeakForTargetMz;
     
-    if (lk_TargetMz.empty() || ak_PeakMz.empty())
+    if (lk_TargetMzMin.empty() || ak_PeakMz.empty())
         return lk_PeakForTargetMz;
     
-    int li_PeakLowIndex = 0;
-    int li_PeakHighIndex = 0;
+    int li_PeakIndex = 0;
     int li_TargetIndex = 0;
-    double ld_TargetMz = lk_TargetMz[li_TargetIndex];
-    double ld_Error = ld_TargetMz * (ad_MassAccuracy / 1000000.0);
-    double ld_TargetMzMin = ld_TargetMz - ld_Error;
-    double ld_TargetMzMax = ld_TargetMz + ld_Error;
+    double ld_TargetMzMin = lk_TargetMzMin[li_TargetIndex];
+    double ld_TargetMzMax = 2.0 * ak_TargetMzAndIntensity[lk_TargetIds[li_TargetIndex]].first - ld_TargetMzMin;
     
     while (true)
     {
         // advance both peak pointers while we're not within the target range
-        while (ak_PeakMz[li_PeakLowIndex] < ld_TargetMzMin)
+        while (ak_PeakMz[li_PeakIndex] < ld_TargetMzMin)
         {
-            ++li_PeakLowIndex;
-            li_PeakHighIndex = li_PeakLowIndex;
-            if (li_PeakLowIndex >= ak_PeakMz.size())
+            ++li_PeakIndex;
+            if (li_PeakIndex >= ak_PeakMz.size())
                 break;
         }
-        if (li_PeakLowIndex >= ak_PeakMz.size())
+        if (li_PeakIndex >= ak_PeakMz.size())
             break;
         
-        if (ak_PeakMz[li_PeakLowIndex] <= ld_TargetMzMax)
+        if (ak_PeakMz[li_PeakIndex] <= ld_TargetMzMax)
         {
             // we're within target range now
-            // advance the peak high index as long as it's within the target range
-            while ((li_PeakHighIndex < ak_PeakMz.size() - 1) && (ak_PeakMz[li_PeakHighIndex + 1] <= ld_TargetMzMax))
-                ++li_PeakHighIndex;
-            // if there's only one peak within the target range, assign it
-            if (li_PeakLowIndex == li_PeakHighIndex)
-                lk_PeakForTargetMz[li_TargetIndex] = li_PeakLowIndex;
+            // make sure that there is no other peak within the target range
+            if ((ak_ForbiddenIds.contains(li_TargetIndex)) || ((li_PeakIndex >= ak_PeakMz.size() - 1) || (ak_PeakMz[li_PeakIndex + 1] > ld_TargetMzMax)))
+            {
+                // assign the peak, because
+                // 1. it's a forbidden target, and it doesn't matter how many peaks match, or
+                // 2. it's the last peak, or
+                // 3. there's only one peak within the target range
+                lk_PeakForTargetMz[li_TargetIndex] = li_PeakIndex;
+            }
         }
         
         // advance target pointer
         ++li_TargetIndex;
-        if (li_TargetIndex >= lk_TargetMz.size())
+        if (li_TargetIndex >= lk_TargetMzMin.size())
             break;
         
-        ld_TargetMz = lk_TargetMz[li_TargetIndex];
-        ld_Error = ld_TargetMz * (ad_MassAccuracy / 1000000.0);
-        ld_TargetMzMin = ld_TargetMz - ld_Error;
-        ld_TargetMzMax = ld_TargetMz + ld_Error;
+        ld_TargetMzMin = lk_TargetMzMin[li_TargetIndex];
+        ld_TargetMzMax = 2.0 * ak_TargetMzAndIntensity[lk_TargetIds[li_TargetIndex]].first - ld_TargetMzMin;
     }
     
     return lk_PeakForTargetMz;
@@ -1072,6 +1131,7 @@ void k_QuantifierBase::parseLabel()
 //         printf("AE for %s:\n", ls_AminoAcid.toStdString().c_str());
         tk_ArtificialEnvironment lk_Environment = lk_EnvironmentForAminoAcid[ls_AminoAcid];
         QHash<QString, QList<double> > lk_Abundances;
+        int li_MassShift = 0;
         foreach (QString ls_Element, lk_Environment.keys())
         {
             r_IsotopeAbundance lr_IsotopeAbundance = lk_Environment[ls_Element];
@@ -1082,8 +1142,15 @@ void k_QuantifierBase::parseLabel()
             if (lr_IsotopeAbundance.mf_Efficiency < 1.0)
                 lk_AbundanceNumbers[1 - lr_IsotopeAbundance.mi_Isotope] = 1.0 - lr_IsotopeAbundance.mf_Efficiency;
             lk_Abundances[ls_Element] = lk_AbundanceNumbers;
+            int li_AtomCount = 0;
+            if (mk_AminoAcidComposition[ls_AminoAcid.at(0).toAscii()].contains(ls_Element))
+                li_AtomCount = mk_AminoAcidComposition[ls_AminoAcid.at(0).toAscii()][ls_Element];
+            if (li_AtomCount > 0)
+                li_MassShift += (int)round(mk_IsotopeEnvelope.mk_ElementIsotopeMassShift[ls_Element][lr_IsotopeAbundance.mi_Isotope]) * li_AtomCount;
         }
         mk_HeavyIsotopeEnvelopeForAminoAcid[ls_AminoAcid] = k_IsotopeEnvelope(lk_Abundances);
+        
+        mk_HeavyMassShiftForAminoAcid[ls_AminoAcid] = li_MassShift;
         
         // make description
         QStringList lk_ElementList = lk_Abundances.keys();
@@ -1233,4 +1300,18 @@ tk_IsotopeEnvelope k_QuantifierBase::heavyEnvelopeForPeptide(QString as_Peptide)
     }
     
     return lr_HeavyMass;
+}
+
+
+int k_QuantifierBase::heavyMassShiftForPeptide(QString as_Peptide)
+{
+    QHash<QString, int> lk_Composition = compositionForPeptide(as_Peptide);
+    
+    int li_MassShift = 0;
+    
+    QHash<QString, QHash<QString, int> > lk_CompositionForAminoAcid;
+    for (int i = 0; i < as_Peptide.length(); ++i)
+        li_MassShift += mk_HeavyMassShiftForAminoAcid[as_Peptide.mid(i, 1)];
+    
+    return li_MassShift;
 }
