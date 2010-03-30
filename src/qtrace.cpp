@@ -42,6 +42,7 @@ int main(int ai_ArgumentCount, char** ac_Arguments__)
             << r_Parameter::RequireAbundance
             << r_Parameter::ConsiderAbundance
             << r_Parameter::MaxFitError
+            << r_Parameter::FixedIsotopePeakCount
             << r_Parameter::CheckForbiddenPeak
             << r_Parameter::Quiet
             << r_Parameter::LogScale

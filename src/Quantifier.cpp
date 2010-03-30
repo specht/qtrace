@@ -40,7 +40,13 @@ k_Quantifier::~k_Quantifier()
 void k_Quantifier::run()
 {
     if (mk_Peptides.empty() || mk_SpectraFiles.empty())
-        printUsageAndExit();
+    {
+        if (mk_Peptides.empty())
+            printf("Error: No peptides have been specified.\n");
+        if (mk_SpectraFiles.empty())
+            printf("Error: No spectra files have been specified.\n");
+        exit(1);
+    }
     
     removeNonPeptides(mk_Peptides);
     

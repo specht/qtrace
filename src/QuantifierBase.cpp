@@ -209,6 +209,9 @@ void k_QuantifierBase::progressFunction(QString as_ScanId, bool)
 
 void k_QuantifierBase::parseArguments(QStringList& ak_Arguments)
 {
+    if (ak_Arguments.empty())
+        printUsageAndExit();
+    
     if (!ak_Arguments.empty() && ak_Arguments.first() == "--version")
     {
         printf("%s %s\n", ms_ProgramName.toStdString().c_str(), gs_Version.toStdString().c_str());
@@ -306,55 +309,6 @@ void k_QuantifierBase::parseArguments(QStringList& ak_Arguments)
             break;
         }
     }
-
-/*
-    QStringList lk_SpectraFiles;
-    QStringList lk_Peptides;
-    while (!lk_Arguments.empty())
-    {
-        if (lk_Arguments.first() == "--spectraFiles")
-        {
-            lk_Arguments.removeFirst();
-            while (!lk_Arguments.empty() && !lk_Arguments.first().startsWith("-"))
-                lk_SpectraFiles << lk_Arguments.takeFirst();
-        }
-        else if (lk_Arguments.first() == "--peptides")
-        {
-            lk_Arguments.removeFirst();
-            while (!lk_Arguments.empty() && !lk_Arguments.first().startsWith("-"))
-                lk_Peptides.push_back(lk_Arguments.takeFirst().toUpper());
-        }
-        else if (lk_Arguments.first() == "--peptideFiles")
-        {
-            lk_Arguments.removeFirst();
-            while (!lk_Arguments.empty() && !lk_Arguments.first().startsWith("-"))
-            {   
-                QString ls_Path = lk_Arguments.takeFirst();
-                QFile lk_File(ls_Path);
-                if (!lk_File.open(QIODevice::ReadOnly))
-                {
-                    printf("Error: Unable to open %s.\n", ls_Path.toStdString().c_str());
-                    exit(1);
-                }
-                QTextStream lk_Stream(&lk_File);
-                while (!lk_Stream.atEnd())
-                {
-                    QString ls_Line = lk_Stream.readLine().trimmed();
-                    if (!ls_Line.startsWith(">"))
-                        lk_Peptides.push_back(ls_Line.toUpper());
-                }
-            }
-        }
-        else
-        {
-            printf("Error: Unknown command line switch: %s\n", lk_Arguments.first().toStdString().c_str());
-            exit(1);
-        }
-    }
-    
-    if (lk_SpectraFiles.empty() || lk_Peptides.empty())
-        printUsageAndExit();
-    */
 }
 
 
@@ -716,6 +670,9 @@ void k_QuantifierBase::printUsageAndExit()
     printf("Usage: %s [options] %s\n", ms_ProgramName.toStdString().c_str(), ms_AdditionalArguments.toStdString().c_str());
     printf("Spectra files may be mzData, mzXML or mzML, optionally compressed (.gz|.bz2|.zip).\n");
     printf("Options:\n");
+    
+    // MAIN SECTION
+    
     if (mk_Parameters.contains(r_Parameter::Label))
     {
         printf("  --label <string> (default: %s)\n", DEFAULT_LABEL);
@@ -732,15 +689,18 @@ void k_QuantifierBase::printUsageAndExit()
         printf("        Labeling efficiencies can only be specified for C and N.\n");
         printf("        X denotes any amino acid: 'X 15N' is the same as '15N'.\n");
     }
-    if (mk_Parameters.contains(r_Parameter::ScanType))
-    {
-        printf("  --scanType [full|sim|all] (default: all)\n");
-    }
     if (mk_Parameters.contains(r_Parameter::UseIsotopeEnvelopes))
     {
         printf("  --useIsotopeEnvelopes [yes|no] (default: %s)\n", DEFAULT_USE_ISOTOPE_ENVELOPES ? "yes" : "no");
         printf("      Specify whether amounts should be estimated via isotope envelope fitting\n");
         printf("      or whether a constant number of peaks should be used instead.\n");
+    }
+
+    // PEAK PICKING SECTION
+
+    if (mk_Parameters.contains(r_Parameter::ScanType))
+    {
+        printf("  --scanType [full|sim|all] (default: all)\n");
     }
     if (mk_Parameters.contains(r_Parameter::MinCharge))
     {
@@ -759,6 +719,11 @@ void k_QuantifierBase::printUsageAndExit()
         printf("  --massAccuracy (ppm) <float> (default: %1.1f)\n", DEFAULT_MASS_ACCURACY);
         printf("      This mass accuracy is used to check for the presence of peaks.\n");
     }
+    if (mk_Parameters.contains(r_Parameter::CheckForbiddenPeak))
+    {
+        printf("  --checkForbiddenPeak [yes|no] (default: %s)\n", DEFAULT_CHECK_FORBIDDEN_PEAK ? "yes" : "no");
+        printf("      Specify whether the forbidden peak is required to be absent.\n");
+    }
     if (mk_Parameters.contains(r_Parameter::AbsenceMassAccuracyFactor))
     {
         printf("  --absenceMassAccuracyFactor <float> (default: %1.1f)\n", DEFAULT_ABSENCE_MASS_ACCURACY_FACTOR);
@@ -766,6 +731,9 @@ void k_QuantifierBase::printUsageAndExit()
         printf("      this factor. The specified mass accuracy is multiplied with this factor\n");
         printf("      when checking for peak absence.\n");
     }
+
+    // ISOTOPE ENVELOPE FITTING SECTION
+
     if (mk_Parameters.contains(r_Parameter::RequireAbundance))
     {
         printf("  --requireAbundance <float> (default: %1.1f)\n", DEFAULT_REQUIRE_ABUNDANCE);
@@ -781,17 +749,18 @@ void k_QuantifierBase::printUsageAndExit()
         printf("  --maxFitError <float> (default: %1.2f)\n", DEFAULT_MAX_FIT_ERROR);
         printf("      Specify the maximum error allowed when fitting isotope envelopes.\n");
     }
+    
+    // FIXED ISOTOPE PEAK COUNT SECTION
+
     if (mk_Parameters.contains(r_Parameter::FixedIsotopePeakCount))
     {
-        printf("  --isotopePeaks <float> (default: %d)\n", DEFAULT_FIXED_ISOTOPE_PEAK_COUNT);
+        printf("  --isotopePeaks <int> (default: %d)\n", DEFAULT_FIXED_ISOTOPE_PEAK_COUNT);
         printf("      Specify how many isotope peaks should be added for amount estimation,\n");
         printf("      if --useIsotopeEnvelopes is set to 'no'.\n");
     }
-    if (mk_Parameters.contains(r_Parameter::CheckForbiddenPeak))
-    {
-        printf("  --checkForbiddenPeak [yes|no] (default: %s)\n", DEFAULT_CHECK_FORBIDDEN_PEAK ? "yes" : "no");
-        printf("      Specify whether the forbidden peak is required to be absent.\n");
-    }
+    
+    // OUTPUT FILES SECTION
+    
     if (mk_Parameters.contains(r_Parameter::CsvOutput))
     {
         printf("  --csvOutput [yes|no] (default: yes)\n");
@@ -807,11 +776,17 @@ void k_QuantifierBase::printUsageAndExit()
         printf("  --xhtmlOutputPath <path> (default: none)\n");
         printf("      Output quantitation events as XHTML-embedded SVG to [path].\n");
     }
+    
+    // TWEAKS SECTION
+    
     if (mk_Parameters.contains(r_Parameter::LogScale))
     {
         printf("  --logScale [yes|no] (default: %s)\n", DEFAULT_LOG_SCALE ? "yes" : "no");
         printf("      Use logarithmic scale in XHTML spectra.\n");
     }
+    
+    // MISC. FLAGS SECTION
+    
     if (mk_Parameters.contains(r_Parameter::Quiet))
     {
         printf("  --quiet [yes|no] (default: %s)\n", DEFAULT_QUIET ? "yes" : "no");
