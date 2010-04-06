@@ -54,6 +54,8 @@ void k_Quantifier::run()
 //     /*DEBUG*/printf("\n");
     fflush(stdout);
     
+    QStringList lk_StarAminoAcidOrder = mk_StarAminoAcids.toList();
+    
     // create target peaks
     foreach (QString ls_Peptide, mk_Peptides)
     {
@@ -61,85 +63,134 @@ void k_Quantifier::run()
         double ld_BaseMass = mk_IsotopeEnvelope.massForComposition(lk_Composition);
         mk_RenderBaseMassForPeptide[ls_Peptide] = ld_BaseMass;
         
-        tk_IsotopeEnvelope lk_Envelope_[2];
-        lk_Envelope_[0] = lightEnvelopeForPeptide(ls_Peptide);
-        lk_Envelope_[1] = heavyEnvelopeForPeptide(ls_Peptide);
-        
-        tk_IsotopeEnvelope lk_EnvelopeNormalized_[2];
-        for (int i = 0; i < 2; ++i)
-            lk_EnvelopeNormalized_[i] = k_IsotopeEnvelope::normalize(lk_Envelope_[i]);
-        
-        int li_HeavyMassShift = heavyMassShiftForPeptide(ls_Peptide);
+        tk_StringIntHash lk_StarAminoAcidMaxCount;
+        foreach (QString ls_AminoAcid, lk_StarAminoAcidOrder)
+            lk_StarAminoAcidMaxCount[ls_AminoAcid] = ls_Peptide.count(ls_AminoAcid);
         
         for (int li_Envelope = 0; li_Envelope < 2; ++li_Envelope)
         {
-            for (int li_Charge = mi_MinCharge; li_Charge <= mi_MaxCharge; ++li_Charge)
+            tk_StringIntHash lk_StarAminoAcidCount;
+            foreach (QString ls_AminoAcid, lk_StarAminoAcidOrder)
+                lk_StarAminoAcidCount[ls_AminoAcid] = 0;
+            
+            while (true)
             {
-//                     printf("%s (E%d, %d+)\n", ls_Peptide.toStdString().c_str(), li_Envelope, li_Charge);
-                QString ls_PeptideChargeWeight = QString("%1-%2-%3").arg(ls_Peptide).arg(li_Charge).arg(li_Envelope);
-                mk_TargetsForPeptideChargeWeight[ls_PeptideChargeWeight] = r_EnvelopePeaks();
-                mk_RenderMzRangeForPeptideChargeWeight[ls_PeptideChargeWeight] = tk_DoublePair(1e20, -1e20);
-                mk_RenderIsotopeEnvelopeForPeptideWeight[QString("%1-%2").arg(ls_Peptide).arg(li_Envelope)] = lk_Envelope_[li_Envelope];
+                tk_IsotopeEnvelope lk_Envelope;
+                if (li_Envelope == 0)
+                    lk_Envelope = lightEnvelopeForPeptide(ls_Peptide);
+                else
+                    lk_Envelope = heavyEnvelopeForPeptide(ls_Peptide, lk_StarAminoAcidCount);
                 
-                // add forbidden peak if light envelope
-                if (mb_CheckForbiddenPeak && (li_Envelope == 0))
+                tk_IsotopeEnvelope lk_EnvelopeNormalized = k_IsotopeEnvelope::normalize(lk_Envelope);
+                
+                int li_HeavyMassShift = heavyMassShiftForPeptide(ls_Peptide, lk_StarAminoAcidCount);
+                
+/*                printf("%d %9.4f %9.4f %9.4f\n", li_HeavyMassShift, lk_Envelope[li_HeavyMassShift].first, lk_Envelope[li_HeavyMassShift + 1].first, lk_Envelope[li_HeavyMassShift + 2].first);
+                printf("%d %9.4f %9.4f %9.4f\n", li_HeavyMassShift, lk_Envelope[li_HeavyMassShift].second, lk_Envelope[li_HeavyMassShift + 1].second, lk_Envelope[li_HeavyMassShift + 2].second);*/
+                
+                for (int li_Charge = mi_MinCharge; li_Charge <= mi_MaxCharge; ++li_Charge)
                 {
-                    double ld_Mz = (ld_BaseMass - AVERAGE_NEUTRON + md_HydrogenMass * li_Charge) / li_Charge;
-                    double ld_Error = ld_Mz * (md_MassAccuracy / 1000000.0) * md_AbsenceMassAccuracyFactor;
-                    double ld_MzMin = ld_Mz - ld_Error;
-                    // oy, it's the forbidden peak!
-                    mk_TargetsForPeptideChargeWeight[ls_PeptideChargeWeight].mk_ForbiddenIds.insert(mk_Targets.size());
-                    // add dummy forbidden peak so that k_QuantifierBase::matchTargetsToPeaks 
-                    // will be able to determine the mass range of the forbidden peak
-                    mk_TargetMzAndIntensity[mk_Targets.size()] = tk_DoublePair(ld_Mz, 0.0);
-                    mk_ForbiddenIds.insert(mk_Targets.size());
-                    mk_Targets.insert(ld_MzMin, mk_Targets.size());
-//                     /*DEBUG*/printf("%9.4f %s-%d-forbidden\n", ld_Mz, ls_Peptide.toStdString().c_str(), li_Charge);
-                    mk_RenderMzRangeForPeptideChargeWeight[ls_PeptideChargeWeight].first = std::min<double>(ld_Mz, mk_RenderMzRangeForPeptideChargeWeight[ls_PeptideChargeWeight].first);
-                    mk_RenderMzRangeForPeptideChargeWeight[ls_PeptideChargeWeight].second = std::max<double>(ld_Mz, mk_RenderMzRangeForPeptideChargeWeight[ls_PeptideChargeWeight].second);
-                }
-
-                // add peaks from isotope envelope
-                for (int li_PeakIndex = 0; li_PeakIndex < lk_Envelope_[li_Envelope].size(); ++li_PeakIndex)
-                {
-                    bool lb_Required = false;
-                    bool lb_Considered = false;
+    //                     printf("%s (E%d, %d+)\n", ls_Peptide.toStdString().c_str(), li_Envelope, li_Charge);
+                    QString ls_PeptideChargeWeight = QString("%1-%2-%3").arg(ls_Peptide).arg(li_Charge).arg(li_Envelope);
+                    mk_TargetsForPeptideChargeWeight[ls_PeptideChargeWeight].append(r_EnvelopePeaks());
+                    mk_RenderMzRangeForPeptideChargeWeight[ls_PeptideChargeWeight] = tk_DoublePair(1e20, -1e20);
+                    mk_RenderIsotopeEnvelopeForPeptideWeight[QString("%1-%2").arg(ls_Peptide).arg(li_Envelope)] = lk_Envelope;
                     
-                    double ld_Abundance = lk_Envelope_[li_Envelope][li_PeakIndex].first;
-                    double ld_NormalizedAbundance = lk_EnvelopeNormalized_[li_Envelope][li_PeakIndex].first;
-                    double ld_MassShift = lk_Envelope_[li_Envelope][li_PeakIndex].second;
-                    double ld_Mz = (ld_BaseMass + ld_MassShift + md_HydrogenMass * li_Charge) / li_Charge;
-                    double ld_Error = ld_Mz * (md_MassAccuracy / 1000000.0);
-                    double ld_MzMin = ld_Mz - ld_Error;
-                    if (mb_UseIsotopeEnvelopes)
+                    // add forbidden peak if light envelope
+                    if (mb_CheckForbiddenPeak && (li_Envelope == 0))
                     {
-                        lb_Required = (ld_NormalizedAbundance >= md_RequireAbundance);
-                        lb_Considered = (ld_NormalizedAbundance >= md_ConsiderAbundance);
-                    }
-                    else
-                    {
-                        int li_LightOrHeavyPeakIndex = li_PeakIndex - li_Envelope * li_HeavyMassShift;
-                        lb_Required = (li_LightOrHeavyPeakIndex >= 0) && (li_LightOrHeavyPeakIndex < mi_FixedIsotopePeakCount);
-                    }
-                    
-                    if (lb_Required || lb_Considered)
-                    {
-                        // oy, it's a required peak!
-                        if (lb_Required)
-                            mk_TargetsForPeptideChargeWeight[ls_PeptideChargeWeight].mk_RequiredIds.insert(mk_Targets.size());
-                        else
-                            mk_TargetsForPeptideChargeWeight[ls_PeptideChargeWeight].mk_ConsideredIds.insert(mk_Targets.size());
-                        
-                        mk_TargetMzAndIntensity[mk_Targets.size()] = tk_DoublePair(ld_Mz, ld_Abundance);
+                        double ld_Mz = (ld_BaseMass - AVERAGE_NEUTRON + md_HydrogenMass * li_Charge) / li_Charge;
+                        double ld_Error = ld_Mz * (md_MassAccuracy / 1000000.0) * md_AbsenceMassAccuracyFactor;
+                        double ld_MzMin = ld_Mz - ld_Error;
+                        // oy, it's the forbidden peak!
+                        mk_TargetsForPeptideChargeWeight[ls_PeptideChargeWeight].last().mk_ForbiddenIds.insert(mk_Targets.size());
+                        // add dummy forbidden peak so that k_QuantifierBase::matchTargetsToPeaks 
+                        // will be able to determine the mass range of the forbidden peak
+                        mk_TargetMzAndIntensity[mk_Targets.size()] = tk_DoublePair(ld_Mz, 0.0);
+                        mk_ForbiddenIds.insert(mk_Targets.size());
                         mk_Targets.insert(ld_MzMin, mk_Targets.size());
-//                         /*DEBUG*/printf("%9.4f %s-%d-%d-%d\n", ld_Mz, ls_Peptide.toStdString().c_str(), li_Charge, li_Envelope, li_PeakIndex);
-                    }
-                    
-                    if (ld_NormalizedAbundance > 0.001)
-                    {
+    //                     /*DEBUG*/printf("%9.4f %s-%d-forbidden\n", ld_Mz, ls_Peptide.toStdString().c_str(), li_Charge);
                         mk_RenderMzRangeForPeptideChargeWeight[ls_PeptideChargeWeight].first = std::min<double>(ld_Mz, mk_RenderMzRangeForPeptideChargeWeight[ls_PeptideChargeWeight].first);
                         mk_RenderMzRangeForPeptideChargeWeight[ls_PeptideChargeWeight].second = std::max<double>(ld_Mz, mk_RenderMzRangeForPeptideChargeWeight[ls_PeptideChargeWeight].second);
                     }
+
+                    // add peaks from isotope envelope
+                    for (int li_PeakIndex = 0; li_PeakIndex < lk_Envelope.size(); ++li_PeakIndex)
+                    {
+                        bool lb_Required = false;
+                        bool lb_Considered = false;
+                        
+                        double ld_Abundance = lk_Envelope[li_PeakIndex].first;
+                        double ld_NormalizedAbundance = lk_EnvelopeNormalized[li_PeakIndex].first;
+                        double ld_MassShift = lk_Envelope[li_PeakIndex].second;
+                        double ld_Mz = (ld_BaseMass + ld_MassShift + md_HydrogenMass * li_Charge) / li_Charge;
+                        double ld_Error = ld_Mz * (md_MassAccuracy / 1000000.0);
+                        double ld_MzMin = ld_Mz - ld_Error;
+                        if (mb_UseIsotopeEnvelopes)
+                        {
+                            lb_Required = (ld_NormalizedAbundance >= md_RequireAbundance);
+                            lb_Considered = (ld_NormalizedAbundance >= md_ConsiderAbundance);
+                        }
+                        else
+                        {
+                            int li_LightOrHeavyPeakIndex = li_PeakIndex - li_Envelope * li_HeavyMassShift;
+                            lb_Required = (li_LightOrHeavyPeakIndex >= 0) && (li_LightOrHeavyPeakIndex < mi_FixedIsotopePeakCount);
+                        }
+                        
+                        if (lb_Required || lb_Considered)
+                        {
+                            // oy, it's a required peak!
+                            if (lb_Required)
+                                mk_TargetsForPeptideChargeWeight[ls_PeptideChargeWeight].last().mk_RequiredIds.insert(mk_Targets.size());
+                            else
+                                mk_TargetsForPeptideChargeWeight[ls_PeptideChargeWeight].last().mk_ConsideredIds.insert(mk_Targets.size());
+                            
+                            mk_TargetMzAndIntensity[mk_Targets.size()] = tk_DoublePair(ld_Mz, ld_Abundance);
+                            mk_Targets.insert(ld_MzMin, mk_Targets.size());
+    //                         /*DEBUG*/printf("%9.4f %s-%d-%d-%d\n", ld_Mz, ls_Peptide.toStdString().c_str(), li_Charge, li_Envelope, li_PeakIndex);
+                        }
+                        
+                        if (ld_NormalizedAbundance > 0.001)
+                        {
+                            mk_RenderMzRangeForPeptideChargeWeight[ls_PeptideChargeWeight].first = std::min<double>(ld_Mz, mk_RenderMzRangeForPeptideChargeWeight[ls_PeptideChargeWeight].first);
+                            mk_RenderMzRangeForPeptideChargeWeight[ls_PeptideChargeWeight].second = std::max<double>(ld_Mz, mk_RenderMzRangeForPeptideChargeWeight[ls_PeptideChargeWeight].second);
+                        }
+                    }
+                }
+                // now advance the star amino acid count, and break the loop if we're finished
+                if (li_Envelope == 0)
+                    break;
+                else
+                {
+                    if (lk_StarAminoAcidOrder.empty())
+                        break;
+                    // we're handling the heavy envelope now, increase 
+                    int li_RewindUntil = -1;
+                    for (int i = 0; i < lk_StarAminoAcidOrder.size(); ++i)
+                    {
+                        QString ls_AminoAcid = lk_StarAminoAcidOrder[i];
+                        if (lk_StarAminoAcidCount[ls_AminoAcid] < lk_StarAminoAcidMaxCount[ls_AminoAcid])
+                        {
+                            ++lk_StarAminoAcidCount[ls_AminoAcid];
+                        }
+                        else
+                        {
+                            li_RewindUntil = i;
+                            break;
+                        }
+                    }
+                    bool lb_Finished = false;
+                    if (li_RewindUntil >= 0)
+                    {
+                        for (int i = 0; i <= li_RewindUntil; ++i)
+                            lk_StarAminoAcidCount[lk_StarAminoAcidOrder[i]] = 0;
+                        if (li_RewindUntil + 1 < lk_StarAminoAcidOrder.size())
+                            lk_StarAminoAcidCount[lk_StarAminoAcidOrder[li_RewindUntil + 1]] += 1;
+                        else
+                            lb_Finished = true;
+                    }
+                    if (lb_Finished)
+                        break;
                 }
             }
         }
@@ -198,6 +249,8 @@ void k_Quantifier::run()
 
 void k_Quantifier::handleScan(r_Scan& ar_Scan, bool& ab_Continue)
 {
+    ab_Continue = true;
+    
     if (ar_Scan.mr_Spectrum.mi_PeaksCount == 0)
     {
         printf("Warning: Empty spectrum (scan #%s @ %1.2f minutes)!\n", ar_Scan.ms_Id.toStdString().c_str(), ar_Scan.md_RetentionTime);
@@ -208,21 +261,12 @@ void k_Quantifier::handleScan(r_Scan& ar_Scan, bool& ab_Continue)
 	QList<r_Peak> lk_AllPeaks = k_ScanIterator::findAllPeaks(ar_Scan.mr_Spectrum, md_MinSnr);
     QList<double> lk_AllPeakMz;
     foreach (r_Peak lr_Peak, lk_AllPeaks)
-//     {
         lk_AllPeakMz.append(lr_Peak.md_PeakMz);
-//         printf("%9.4f ", lr_Peak.md_PeakMz);
-//     }
-//     printf("\n");
     
     QHash<int, int> lk_PreMatches = matchTargetsToPeaks(lk_AllPeakMz, mk_Targets, mk_TargetMzAndIntensity, mk_ForbiddenIds);
     QHash<int, int> lk_Matches;
     foreach (int li_Key, lk_PreMatches.keys())
-    {
-/*        printf("%d => %d (%d => %d)\n", 
-               li_Key, lk_PreMatches[li_Key], 
-               mk_Targets.values()[li_Key], lk_PreMatches[li_Key]);*/
         lk_Matches[mk_Targets.values()[li_Key]] = lk_PreMatches[li_Key];
-    }
     
     QSet<int> lk_MatchedTargetIds = lk_Matches.keys().toSet();
     
@@ -244,40 +288,43 @@ void k_Quantifier::handleScan(r_Scan& ar_Scan, bool& ab_Continue)
                 for (int li_Envelope = 0; li_Envelope < 2; ++li_Envelope)
                 {
                     QString ls_PeptideChargeWeightKey = QString("%1-%2-%3").arg(ls_Peptide).arg(li_Charge).arg(li_Envelope);
-
-                    // don't quantify this at all if the forbidden peak was there
-                    if ((li_Envelope == 0) && (mb_CheckForbiddenPeak && (!(mk_TargetsForPeptideChargeWeight[ls_PeptideChargeWeightKey].mk_ForbiddenIds & lk_MatchedTargetIds).empty())))
-                    {
-                        lb_Good_[0] = lb_Good_[1] = false;
-                        break;
-                    }
                     
-                    
-                    QSet<int> lk_AllTargets = 
-                        mk_TargetsForPeptideChargeWeight[ls_PeptideChargeWeightKey].mk_RequiredIds | 
-                        mk_TargetsForPeptideChargeWeight[ls_PeptideChargeWeightKey].mk_ConsideredIds;
-                    foreach (int li_Id, lk_AllTargets)
+                    foreach (r_EnvelopePeaks lr_Peaks, mk_TargetsForPeptideChargeWeight[ls_PeptideChargeWeightKey])
                     {
-                        if (lk_MatchedTargetIds.contains(li_Id))
+                        // don't quantify this at all if the forbidden peak was there
+                        if ((li_Envelope == 0) && (mb_CheckForbiddenPeak && (!(lr_Peaks.mk_ForbiddenIds & lk_MatchedTargetIds).empty())))
                         {
-                            double ld_TargetIntensity = mk_TargetMzAndIntensity[li_Id].second;
-                            double ld_PeakIntensity = lk_AllPeaks[lk_Matches[li_Id]].md_PeakIntensity;
-                            lk_Pairs_[li_Envelope] << tk_DoublePair(ld_TargetIntensity, ld_PeakIntensity);
+                            lb_Good_[0] = lb_Good_[1] = false;
+                            break;
                         }
+                        
+                        
+                        QSet<int> lk_AllTargets = 
+                            lr_Peaks.mk_RequiredIds | 
+                            lr_Peaks.mk_ConsideredIds;
+                        foreach (int li_Id, lk_AllTargets)
+                        {
+                            if (lk_MatchedTargetIds.contains(li_Id))
+                            {
+                                double ld_TargetIntensity = mk_TargetMzAndIntensity[li_Id].second;
+                                double ld_PeakIntensity = lk_AllPeaks[lk_Matches[li_Id]].md_PeakIntensity;
+                                lk_Pairs_[li_Envelope] << tk_DoublePair(ld_TargetIntensity, ld_PeakIntensity);
+                            }
+                        }
+                        if (lk_Pairs_[li_Envelope].size() > 0)
+                            leastSquaresFit(lk_Pairs_[li_Envelope], &ld_FitFactor_[li_Envelope], &ld_FitError_[li_Envelope], &ld_IndividualFitError_[li_Envelope]);
+                        
+                        if ((lk_MatchedTargetIds & lr_Peaks.mk_RequiredIds).size() == lr_Peaks.mk_RequiredIds.size())
+                        {
+                            if (ld_FitError_[li_Envelope] > md_MaxFitError)
+                                lb_Good_[li_Envelope] = false;
+                            else
+                                lb_Good_[li_Envelope] = true;
+                        }
+                        
+                        if (lb_Good_[li_Envelope])
+                            ld_Amounts_[li_Envelope] = ld_FitFactor_[li_Envelope];
                     }
-                    if (lk_Pairs_[li_Envelope].size() > 0)
-                        leastSquaresFit(lk_Pairs_[li_Envelope], &ld_FitFactor_[li_Envelope], &ld_FitError_[li_Envelope], &ld_IndividualFitError_[li_Envelope]);
-                    
-                    if ((lk_MatchedTargetIds & mk_TargetsForPeptideChargeWeight[ls_PeptideChargeWeightKey].mk_RequiredIds).size() == mk_TargetsForPeptideChargeWeight[ls_PeptideChargeWeightKey].mk_RequiredIds.size())
-                    {
-                        if (ld_FitError_[li_Envelope] > md_MaxFitError)
-                            lb_Good_[li_Envelope] = false;
-                        else
-                            lb_Good_[li_Envelope] = true;
-                    }
-                    
-                    if (lb_Good_[li_Envelope])
-                        ld_Amounts_[li_Envelope] = ld_FitFactor_[li_Envelope];
                 }
             }
             else
@@ -287,27 +334,30 @@ void k_Quantifier::handleScan(r_Scan& ar_Scan, bool& ab_Continue)
                 {
                     QString ls_PeptideChargeWeightKey = QString("%1-%2-%3").arg(ls_Peptide).arg(li_Charge).arg(li_Envelope);
 
-                    // don't quantify this at all if the forbidden peak was there
-                    if ((li_Envelope == 0) && (mb_CheckForbiddenPeak && (!(mk_TargetsForPeptideChargeWeight[ls_PeptideChargeWeightKey].mk_ForbiddenIds & lk_MatchedTargetIds).empty())))
+                    foreach (r_EnvelopePeaks lr_Peaks, mk_TargetsForPeptideChargeWeight[ls_PeptideChargeWeightKey])
                     {
-                        lb_Good_[0] = lb_Good_[1] = false;
-                        break;
-                    }
-                    
-                    // skip this if not all required light and heavy peaks are there
-                    if ((lk_MatchedTargetIds & mk_TargetsForPeptideChargeWeight[ls_PeptideChargeWeightKey].mk_RequiredIds).size() == mk_TargetsForPeptideChargeWeight[ls_PeptideChargeWeightKey].mk_RequiredIds.size())
-                    {
-                        QString ls_PeptideChargeWeightKey = QString("%1-%2-%3").arg(ls_Peptide).arg(li_Charge).arg(li_Envelope);
-
-                        QSet<int> lk_AllTargets = 
-                            mk_TargetsForPeptideChargeWeight[ls_PeptideChargeWeightKey].mk_RequiredIds;
-                            
-                        if ((lk_MatchedTargetIds & mk_TargetsForPeptideChargeWeight[ls_PeptideChargeWeightKey].mk_RequiredIds).size() == mk_TargetsForPeptideChargeWeight[ls_PeptideChargeWeightKey].mk_RequiredIds.size())
+                        // don't quantify this at all if the forbidden peak was there
+                        if ((li_Envelope == 0) && (mb_CheckForbiddenPeak && (!(lr_Peaks.mk_ForbiddenIds & lk_MatchedTargetIds).empty())))
                         {
-                            lb_Good_[li_Envelope] = true;
-                            ld_Amounts_[li_Envelope] = 0.0;
-                            foreach (int li_Id, mk_TargetsForPeptideChargeWeight[ls_PeptideChargeWeightKey].mk_RequiredIds)
-                                ld_Amounts_[li_Envelope] += lk_AllPeaks[lk_Matches[li_Id]].md_PeakIntensity;
+                            lb_Good_[0] = lb_Good_[1] = false;
+                            break;
+                        }
+                        
+                        // skip this if not all required light and heavy peaks are there
+                        if ((lk_MatchedTargetIds & lr_Peaks.mk_RequiredIds).size() == lr_Peaks.mk_RequiredIds.size())
+                        {
+                            QString ls_PeptideChargeWeightKey = QString("%1-%2-%3").arg(ls_Peptide).arg(li_Charge).arg(li_Envelope);
+
+                            QSet<int> lk_AllTargets = 
+                                lr_Peaks.mk_RequiredIds;
+                                
+                            if ((lk_MatchedTargetIds & lr_Peaks.mk_RequiredIds).size() == lr_Peaks.mk_RequiredIds.size())
+                            {
+                                lb_Good_[li_Envelope] = true;
+                                ld_Amounts_[li_Envelope] = 0.0;
+                                foreach (int li_Id, lr_Peaks.mk_RequiredIds)
+                                    ld_Amounts_[li_Envelope] += lk_AllPeaks[lk_Matches[li_Id]].md_PeakIntensity;
+                            }
                         }
                     }
                 }

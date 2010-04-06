@@ -36,9 +36,9 @@ along with qTrace.  If not, see <http://www.gnu.org/licenses/>.
 #define DEFAULT_MIN_SNR 2.0
 #define DEFAULT_MASS_ACCURACY 5.0
 #define DEFAULT_ABSENCE_MASS_ACCURACY_FACTOR 2.0
-#define DEFAULT_REQUIRE_ABUNDANCE 0.5
-#define DEFAULT_CONSIDER_ABUNDANCE 0.05
-#define DEFAULT_MAX_FIT_ERROR 0.05
+#define DEFAULT_REQUIRE_ABUNDANCE 0.4
+#define DEFAULT_CONSIDER_ABUNDANCE 0.01
+#define DEFAULT_MAX_FIT_ERROR 0.2
 #define DEFAULT_FIXED_ISOTOPE_PEAK_COUNT 3
 #define DEFAULT_CHECK_FORBIDDEN_PEAK true
 #define DEFAULT_QUIET false
@@ -140,6 +140,7 @@ struct r_Bucket
 // peptide => scan results
 typedef QPair<double, double> tk_DoublePair;
 typedef QHash<QString, double> tk_StringDoubleHash;
+typedef QHash<QString, int> tk_StringIntHash;
 
 
 class k_QuantifierBase: public k_ScanIterator
@@ -176,8 +177,8 @@ protected:
     QString fetchNextToken(QStringList* ak_StringList_, QVariant::Type* ae_Type_);
     QVariant::Type peekNextToken(QStringList ak_StringList);
     tk_IsotopeEnvelope lightEnvelopeForPeptide(QString as_Peptide);
-    tk_IsotopeEnvelope heavyEnvelopeForPeptide(QString as_Peptide);
-    int heavyMassShiftForPeptide(QString as_Peptide);
+    tk_IsotopeEnvelope heavyEnvelopeForPeptide(QString as_Peptide, tk_StringIntHash ak_StarAminoAcids = tk_StringIntHash());
+    int heavyMassShiftForPeptide(QString as_Peptide, tk_StringIntHash ak_StarAminoAcids = tk_StringIntHash());
 
     // general information
     QSet<r_Parameter::Enumeration> mk_Parameters;
@@ -220,8 +221,11 @@ protected:
     // natural isotope envelope generator
     k_IsotopeEnvelope mk_IsotopeEnvelope;
     
-    // this hash contains a heavy isotope generator for every labeled amino acid
-    QHash<QString, k_IsotopeEnvelope> mk_HeavyIsotopeEnvelopeForAminoAcid;
+    // this hash contains a light isotope envelope for every labeled amino acid
+    QHash<QString, tk_IsotopeEnvelope> mk_LightIsotopeEnvelopeForAminoAcid;
+    
+    // this hash contains a heavy isotope envelope for every labeled amino acid
+    QHash<QString, tk_IsotopeEnvelope> mk_HeavyIsotopeEnvelopeForAminoAcid;
     
     // this hash contains a mass shift for every labeled amino acid
     QHash<QString, int> mk_HeavyMassShiftForAminoAcid;
@@ -238,6 +242,7 @@ protected:
     // in one go. The actual m/z for a certain id are stored in mk_TargetMzAndIntensity.
     QMultiMap<double, int> mk_Targets;
     
-    QHash<QString, r_EnvelopePeaks> mk_TargetsForPeptideChargeWeight;
+    QHash<QString, QList<r_EnvelopePeaks> > mk_TargetsForPeptideChargeWeight;
     QSet<int> mk_ForbiddenIds;
+    QSet<QString> mk_StarAminoAcids;
 };

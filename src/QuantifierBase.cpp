@@ -172,6 +172,9 @@ k_QuantifierBase::k_QuantifierBase(QStringList& ak_Arguments, QSet<r_Parameter::
 	}
 	lk_File.close();
     
+    foreach (char lc_AminoAcid, mk_AminoAcidComposition.keys())
+        mk_LightIsotopeEnvelopeForAminoAcid[QString("%1").arg(lc_AminoAcid)] = mk_IsotopeEnvelope.isotopeEnvelopeForComposition(compositionForPeptide(QString("%1").arg(lc_AminoAcid)));
+    
     if (mk_pCsvDevice)
         mk_pCsvStream = RefPtr<QTextStream>(new QTextStream(mk_pCsvDevice.get_Pointer()));
     if (mk_pXhtmlDevice)
@@ -386,13 +389,15 @@ QString k_QuantifierBase::renderScanAsSvg(r_Scan& ar_Scan, r_ScanQuantitationRes
     for (int li_Weight = 0; li_Weight < 2; ++li_Weight)
     {
         QString ls_Key = QString("%1-%2-%3").arg(ar_QuantitationResult.ms_Peptide).arg(ar_QuantitationResult.mi_Charge).arg(li_Weight);
-        r_EnvelopePeaks lr_Peaks = mk_TargetsForPeptideChargeWeight[ls_Key];
-        foreach (int li_Id, lr_Peaks.mk_RequiredIds | lr_Peaks.mk_ConsideredIds)
+        foreach (r_EnvelopePeaks lr_Peaks, mk_TargetsForPeptideChargeWeight[ls_Key])
         {
-            if (ak_Matches.contains(li_Id))
+            foreach (int li_Id, lr_Peaks.mk_RequiredIds | lr_Peaks.mk_ConsideredIds)
             {
-                r_Peak& lr_Peak = ak_AllPeaks[ak_Matches[li_Id]];
-                ymax = std::max<double>(ymax, lr_Peak.md_PeakIntensity);
+                if (ak_Matches.contains(li_Id))
+                {
+                    r_Peak& lr_Peak = ak_AllPeaks[ak_Matches[li_Id]];
+                    ymax = std::max<double>(ymax, lr_Peak.md_PeakIntensity);
+                }
             }
         }
     }
@@ -579,34 +584,36 @@ QString k_QuantifierBase::renderScanAsSvg(r_Scan& ar_Scan, r_ScanQuantitationRes
         for (int li_Weight = 0; li_Weight < 2; ++li_Weight)
         {
             QString ls_Key = QString("%1-%2-%3").arg(ar_QuantitationResult.ms_Peptide).arg(ar_QuantitationResult.mi_Charge).arg(li_Weight);
-            r_EnvelopePeaks lr_Peaks = mk_TargetsForPeptideChargeWeight[ls_Key];
-            foreach (int li_Id, lr_Peaks.mk_RequiredIds | lr_Peaks.mk_ConsideredIds)
+            foreach (r_EnvelopePeaks lr_Peaks, mk_TargetsForPeptideChargeWeight[ls_Key])
             {
-                if (ak_Matches.contains(li_Id))
+                foreach (int li_Id, lr_Peaks.mk_RequiredIds | lr_Peaks.mk_ConsideredIds)
                 {
-                    if (lr_Peaks.mk_RequiredIds.contains(li_Id))
-                        lk_Pen.setStyle(Qt::SolidLine);
-                    else
-                        lk_Pen.setStyle(Qt::DotLine);
-                    lk_Pen.setColor(QColor(TANGO_SKY_BLUE_1));
-                    lk_Painter.setPen(lk_Pen);
-                    
-                    r_Peak& lr_Peak = ak_AllPeaks[ak_Matches[li_Id]];
-                    double x = (lr_Peak.md_PeakMz - xmin) * dx + x0;
-                    double y = this->scale(lr_Peak.md_PeakIntensity / ymax) / ymaxScaled * dy + y0;
-                    lk_Painter.drawLine(QPointF(x, y0), QPointF(x, y));
-                    lk_Painter.drawArc(QRectF(QPointF(x, y) - QPointF(3.0, 3.0), QSize(6.0, 6.0)), 0, 5760);
-                }
-                else
-                {
-                    if (lr_Peaks.mk_RequiredIds.contains(li_Id))
+                    if (ak_Matches.contains(li_Id))
                     {
-                        lk_Pen.setStyle(Qt::SolidLine);
-                        lk_Pen.setColor(QColor(TANGO_SCARLET_RED_2));
+                        if (lr_Peaks.mk_RequiredIds.contains(li_Id))
+                            lk_Pen.setStyle(Qt::SolidLine);
+                        else
+                            lk_Pen.setStyle(Qt::DotLine);
+                        lk_Pen.setColor(QColor(TANGO_SKY_BLUE_1));
                         lk_Painter.setPen(lk_Pen);
                         
-                        double x = (mk_TargetMzAndIntensity[li_Id].first - xmin) * dx + x0;
-                        lk_Painter.drawLine(QPointF(x, y0), QPointF(x, y0 + dy));
+                        r_Peak& lr_Peak = ak_AllPeaks[ak_Matches[li_Id]];
+                        double x = (lr_Peak.md_PeakMz - xmin) * dx + x0;
+                        double y = this->scale(lr_Peak.md_PeakIntensity / ymax) / ymaxScaled * dy + y0;
+                        lk_Painter.drawLine(QPointF(x, y0), QPointF(x, y));
+                        lk_Painter.drawArc(QRectF(QPointF(x, y) - QPointF(3.0, 3.0), QSize(6.0, 6.0)), 0, 5760);
+                    }
+                    else
+                    {
+                        if (lr_Peaks.mk_RequiredIds.contains(li_Id))
+                        {
+                            lk_Pen.setStyle(Qt::SolidLine);
+                            lk_Pen.setColor(QColor(TANGO_SCARLET_RED_2));
+                            lk_Painter.setPen(lk_Pen);
+                            
+                            double x = (mk_TargetMzAndIntensity[li_Id].first - xmin) * dx + x0;
+                            lk_Painter.drawLine(QPointF(x, y0), QPointF(x, y0 + dy));
+                        }
                     }
                 }
             }
@@ -1020,6 +1027,7 @@ void k_QuantifierBase::parseLabel()
 
     int li_State = 0;
     QSet<QString> lk_AminoAcidScope;
+    QString ls_LastAminoAcid;
     
     // this hash contains special environmental conditions for every amino acid
     // if an amino acid is not contained, it comes from natural conditions!
@@ -1034,7 +1042,20 @@ void k_QuantifierBase::parseLabel()
             if (le_TokenType == QVariant::String)
             {
                 // we found a scope-defining amino acid prefix
-                lk_AminoAcidScope << ls_Token;
+                if (ls_Token == "*")
+                {
+                    if (ls_LastAminoAcid.isEmpty())
+                    {
+                        printf("Error: A star (*) must follow immediately after an amino acid.\n");
+                        exit(1);
+                    }
+                    mk_StarAminoAcids << ls_LastAminoAcid;
+                }
+                else
+                {
+                    ls_LastAminoAcid = ls_Token;
+                    lk_AminoAcidScope << ls_Token;
+                }
             }
             else
                 li_State = 1;
@@ -1123,7 +1144,7 @@ void k_QuantifierBase::parseLabel()
             if (li_AtomCount > 0)
                 li_MassShift += (int)round(mk_IsotopeEnvelope.mk_ElementIsotopeMassShift[ls_Element][lr_IsotopeAbundance.mi_Isotope]) * li_AtomCount;
         }
-        mk_HeavyIsotopeEnvelopeForAminoAcid[ls_AminoAcid] = k_IsotopeEnvelope(lk_Abundances);
+        mk_HeavyIsotopeEnvelopeForAminoAcid[ls_AminoAcid] = k_IsotopeEnvelope(lk_Abundances).isotopeEnvelopeForComposition(compositionForPeptide(ls_AminoAcid));
         
         mk_HeavyMassShiftForAminoAcid[ls_AminoAcid] = li_MassShift;
         
@@ -1186,7 +1207,7 @@ QStringList k_QuantifierBase::tokenize(QString as_String)
                 }
             }
         }
-        else if (lk_Char.isLetter())
+        else if (lk_Char.isLetter() || lk_Char == '*')
         {
             lk_Result << QString(lk_Char);
             lb_Append = true;
@@ -1240,16 +1261,53 @@ tk_IsotopeEnvelope k_QuantifierBase::lightEnvelopeForPeptide(QString as_Peptide)
 }
 
 
-tk_IsotopeEnvelope k_QuantifierBase::heavyEnvelopeForPeptide(QString as_Peptide)
+tk_IsotopeEnvelope k_QuantifierBase::heavyEnvelopeForPeptide(QString as_Peptide, tk_StringIntHash ak_StarAminoAcids)
 {
-    QHash<QString, int> lk_Composition = compositionForPeptide(as_Peptide);
+    tk_IsotopeEnvelope lk_Result;
+
+    foreach (QString ls_AminoAcid, mk_StarAminoAcids)
+        if (!ak_StarAminoAcids.contains(ls_AminoAcid))
+            ak_StarAminoAcids[ls_AminoAcid] = 0;
+        
+    tk_StringIntHash lk_AvailableStarAminoAcids;
+    foreach (QString ls_AminoAcid, ak_StarAminoAcids.keys())
+        lk_AvailableStarAminoAcids[ls_AminoAcid] = ak_StarAminoAcids[ls_AminoAcid];
+    
+    bool lb_First = true;
+    
+    for (int i = 0; i < as_Peptide.length(); ++i)
+    {
+        QString ls_AminoAcid = as_Peptide.mid(i, 1);
+        tk_IsotopeEnvelope lk_UseEnvelope = mk_LightIsotopeEnvelopeForAminoAcid[ls_AminoAcid];
+        if (mk_HeavyIsotopeEnvelopeForAminoAcid.contains(ls_AminoAcid))
+        {
+            if (mk_StarAminoAcids.contains(ls_AminoAcid))
+            {
+                if (lk_AvailableStarAminoAcids[ls_AminoAcid] > 0)
+                {
+                    lk_UseEnvelope = mk_HeavyIsotopeEnvelopeForAminoAcid[ls_AminoAcid];
+                    --lk_AvailableStarAminoAcids[ls_AminoAcid];
+                }
+            }
+            else
+                lk_UseEnvelope = mk_HeavyIsotopeEnvelopeForAminoAcid[ls_AminoAcid];
+        }
+        if (lb_First)
+            lk_Result = lk_UseEnvelope;
+        else
+            lk_Result = mk_IsotopeEnvelope.add(lk_Result, lk_UseEnvelope);
+        lb_First = false;
+    }
+    return lk_Result;
+    // :TODO: fix this for star amino acids
+/*    QHash<QString, int> lk_Composition = compositionForPeptide(as_Peptide);
     
     QHash<QString, QHash<QString, int> > lk_CompositionForAminoAcid;
     for (int i = 0; i < as_Peptide.length(); ++i)
     {
         QString ls_AminoAcid = as_Peptide.mid(i, 1);
         QString ls_Id = QString();
-        if (mk_HeavyIsotopeEnvelopeForAminoAcid.contains(ls_AminoAcid))
+        //if (mk_HeavyIsotopeEnvelopeForAminoAcid.contains(ls_AminoAcid) || mk_StarAminoAcids.contains(ls_AminoAcid))
             ls_Id = ls_AminoAcid;
         QHash<QString, int> lk_ThisComposition = compositionForPeptide(ls_AminoAcid);
         foreach (QString ls_Element, lk_ThisComposition.keys())
@@ -1262,11 +1320,32 @@ tk_IsotopeEnvelope k_QuantifierBase::heavyEnvelopeForPeptide(QString as_Peptide)
     
     tk_IsotopeEnvelope lr_HeavyMass;
     bool lb_First = true;
+
+    tk_StringIntHash lk_UsedStarAminoAcids;
+
+    foreach (QString ls_AminoAcid, mk_StarAminoAcids)
+        if (!ak_StarAminoAcids.contains(ls_AminoAcid))
+            ak_StarAminoAcids[ls_AminoAcid] = 0;
+        
+    foreach (QString ls_AminoAcid, ak_StarAminoAcids.keys())
+        lk_UsedStarAminoAcids[ls_AminoAcid] = 0;
+    
     foreach (QString ls_Id, lk_CompositionForAminoAcid.keys())
     {
         k_IsotopeEnvelope* lk_UseEnvelope_ = &mk_IsotopeEnvelope;
         if (!ls_Id.isEmpty())
-            lk_UseEnvelope_ = &mk_HeavyIsotopeEnvelopeForAminoAcid[ls_Id];
+        {
+            if (mk_StarAminoAcids.contains(ls_Id))
+            {
+                if (lk_UsedStarAminoAcids[ls_Id] < ak_StarAminoAcids[ls_Id])
+                {
+                    lk_UseEnvelope_ = &mk_HeavyIsotopeEnvelopeForAminoAcid[ls_Id];
+                    ++lk_UsedStarAminoAcids[ls_Id];
+                }
+            }
+            else
+                lk_UseEnvelope_ = &mk_HeavyIsotopeEnvelopeForAminoAcid[ls_Id];
+        }
         if (lb_First)
             lr_HeavyMass = lk_UseEnvelope_->isotopeEnvelopeForComposition(lk_CompositionForAminoAcid[ls_Id]);
         else
@@ -1274,19 +1353,42 @@ tk_IsotopeEnvelope k_QuantifierBase::heavyEnvelopeForPeptide(QString as_Peptide)
         lb_First = false;
     }
     
-    return lr_HeavyMass;
+    return lr_HeavyMass;*/
 }
 
 
-int k_QuantifierBase::heavyMassShiftForPeptide(QString as_Peptide)
+int k_QuantifierBase::heavyMassShiftForPeptide(QString as_Peptide, tk_StringIntHash ak_StarAminoAcids)
 {
     QHash<QString, int> lk_Composition = compositionForPeptide(as_Peptide);
     
     int li_MassShift = 0;
     
+    tk_StringIntHash lk_UsedStarAminoAcids;
+    
+    foreach (QString ls_AminoAcid, mk_StarAminoAcids)
+        if (!ak_StarAminoAcids.contains(ls_AminoAcid))
+            ak_StarAminoAcids[ls_AminoAcid] = 0;
+        
+    foreach (QString ls_AminoAcid, ak_StarAminoAcids.keys())
+        lk_UsedStarAminoAcids[ls_AminoAcid] = 0;
+    
     QHash<QString, QHash<QString, int> > lk_CompositionForAminoAcid;
     for (int i = 0; i < as_Peptide.length(); ++i)
-        li_MassShift += mk_HeavyMassShiftForAminoAcid[as_Peptide.mid(i, 1)];
+    {
+        QString ls_AminoAcid = as_Peptide.mid(i, 1);
+        int li_Delta = 0;
+        if (!mk_StarAminoAcids.contains(ls_AminoAcid))
+            li_Delta = mk_HeavyMassShiftForAminoAcid[ls_AminoAcid];
+        else
+        {
+            if (lk_UsedStarAminoAcids[ls_AminoAcid] < ak_StarAminoAcids[ls_AminoAcid])
+            {
+                li_Delta = mk_HeavyMassShiftForAminoAcid[ls_AminoAcid];
+                ++lk_UsedStarAminoAcids[ls_AminoAcid];
+            }
+        }
+        li_MassShift += li_Delta;
+    }
     
     return li_MassShift;
 }
