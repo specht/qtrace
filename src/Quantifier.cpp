@@ -50,7 +50,7 @@ void k_Quantifier::run()
     
     removeNonPeptides(mk_Peptides);
     
-    printf("Calculating target peaks for %d peptides...", mk_Peptides.size());
+    printf("Calculating target peaks for %d peptide%s... ", mk_Peptides.size(), mk_Peptides.size() == 1 ? "" : "s");
 //     /*DEBUG*/printf("\n");
     fflush(stdout);
     
