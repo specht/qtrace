@@ -331,7 +331,7 @@ QString k_QuantifierBase::renderScanAsSvg(r_Scan& ar_Scan, r_ScanQuantitationRes
 	double ld_Height = ld_Width / ld_Ratio;
 	double ld_BorderTop = 4.0;
 	double ld_BorderRight = 16.0;
-	double ld_BorderBottom = 4.0;
+	double ld_BorderBottom = 20.0;
 	double ld_BorderLeft = 16.0;
 	
 	if (ar_QuantitationResult.md_MinMz == 0.0)
@@ -368,24 +368,32 @@ QString k_QuantifierBase::renderScanAsSvg(r_Scan& ar_Scan, r_ScanQuantitationRes
 	xmin = ar_QuantitationResult.md_MinMz;
 	xmax = ar_QuantitationResult.md_MaxMz;
 	double ymax = 0.0;
-    if (ar_QuantitationResult.md_UnlabeledProfileScale > 0.0)
+/*    foreach (QString ls_Title, ar_QuantitationResult.mk_UnlabeledProfileScale.keys())
     {
-        tk_IsotopeEnvelope lk_IsotopeEnvelope = mk_RenderIsotopeEnvelopeForPeptideWeight[ar_QuantitationResult.ms_Peptide + "-0"];
-        for (int i = 0; i < lk_IsotopeEnvelope.size(); ++i)
+        double ld_Scale = ar_QuantitationResult.mk_UnlabeledProfileScale[ls_Title];
+        if (ld_Scale > 0.0)
         {
-            double ld_Abundance = lk_IsotopeEnvelope[i].first * ar_QuantitationResult.md_UnlabeledProfileScale;
-            ymax = std::max<double>(ymax, ld_Abundance);
+            tk_IsotopeEnvelope lk_IsotopeEnvelope = mk_RenderIsotopeEnvelopeForPeptideWeight[ar_QuantitationResult.ms_Peptide + "-0"][ls_Title];
+            for (int i = 0; i < lk_IsotopeEnvelope.size(); ++i)
+            {
+                double ld_Abundance = lk_IsotopeEnvelope[i].first * ld_Scale;
+                ymax = std::max<double>(ymax, ld_Abundance);
+            }
         }
     }
-    if (ar_QuantitationResult.md_LabeledProfileScale > 0.0)
+    foreach (QString ls_Title, ar_QuantitationResult.mk_LabeledProfileScale.keys())
     {
-        tk_IsotopeEnvelope lk_IsotopeEnvelope = mk_RenderIsotopeEnvelopeForPeptideWeight[ar_QuantitationResult.ms_Peptide + "-1"];
-        for (int i = 0; i < lk_IsotopeEnvelope.size(); ++i)
+        double ld_Scale = ar_QuantitationResult.mk_LabeledProfileScale[ls_Title];
+        if (ld_Scale > 0.0)
         {
-            double ld_Abundance = lk_IsotopeEnvelope[i].first * ar_QuantitationResult.md_LabeledProfileScale;
-            ymax = std::max<double>(ymax, ld_Abundance);
+            tk_IsotopeEnvelope lk_IsotopeEnvelope = mk_RenderIsotopeEnvelopeForPeptideWeight[ar_QuantitationResult.ms_Peptide + "-1"][ls_Title];
+            for (int i = 0; i < lk_IsotopeEnvelope.size(); ++i)
+            {
+                double ld_Abundance = lk_IsotopeEnvelope[i].first * ld_Scale;
+                ymax = std::max<double>(ymax, ld_Abundance);
+            }
         }
-    }
+    }*/
     for (int li_Weight = 0; li_Weight < 2; ++li_Weight)
     {
         QString ls_Key = QString("%1-%2-%3").arg(ar_QuantitationResult.ms_Peptide).arg(ar_QuantitationResult.mi_Charge).arg(li_Weight);
@@ -455,91 +463,53 @@ QString k_QuantifierBase::renderScanAsSvg(r_Scan& ar_Scan, r_ScanQuantitationRes
         
         if (mb_UseIsotopeEnvelopes)
         {
-            if (ar_QuantitationResult.md_UnlabeledProfileScale > 0.0)
+            foreach (QString ls_WeightTitle, ar_QuantitationResult.mk_ProfileScale.keys())
             {
-                lk_IsotopeEnvelope = mk_RenderIsotopeEnvelopeForPeptideWeight[ls_Peptide + "-0"];
-                
-                lb_DrawnOnePoint = false;
-                ld_LastMz = 0.0;
-                QPainterPath lk_Path;
-                for (int i = 0; i < lk_IsotopeEnvelope.size(); ++i)
+                double ld_ProfileScale = ar_QuantitationResult.mk_ProfileScale[ls_WeightTitle];
+                double lb_Good = ar_QuantitationResult.mk_Good[ls_WeightTitle];
+                if (ld_ProfileScale > 0.0)
                 {
-                    double ld_Abundance = lk_IsotopeEnvelope[i].first * ar_QuantitationResult.md_UnlabeledProfileScale;
-                    double ld_Mz = (ld_PeptideBaseMass + lk_IsotopeEnvelope[i].second + md_HydrogenMass * li_Charge) / li_Charge;
-                    double x = (ld_Mz - xmin) * dx + x0;
-                    double y = this->scale(ld_Abundance / ymax) / ymaxScaled;
-                    if (y > 0.001)
+                    lk_IsotopeEnvelope = mk_RenderIsotopeEnvelopeForPeptideWeightTitle[ls_Peptide + "-" + ls_WeightTitle];
+                    
+                    lb_DrawnOnePoint = false;
+                    ld_LastMz = 0.0;
+                    QPainterPath lk_Path;
+                    for (int i = 0; i < lk_IsotopeEnvelope.size(); ++i)
                     {
-                        y = y * dy + y0;
-                        if (!lb_DrawnOnePoint)
+                        double ld_Abundance = lk_IsotopeEnvelope[i].first * ld_ProfileScale;
+                        double ld_Mz = (ld_PeptideBaseMass + lk_IsotopeEnvelope[i].second + md_HydrogenMass * li_Charge) / li_Charge;
+                        double x = (ld_Mz - xmin) * dx + x0;
+                        double y = this->scale(ld_Abundance / ymax) / ymaxScaled;
+                        if (y > 0.001)
                         {
-                            lk_Path.moveTo(QPointF(((ld_Mz - 0.5 / li_Charge) - xmin) * dx + x0, y0));
-                            lb_DrawnOnePoint = true;
+                            y = y * dy + y0;
+                            if (!lb_DrawnOnePoint)
+                            {
+                                lk_Path.moveTo(QPointF(((ld_Mz - 0.5 / li_Charge) - xmin) * dx + x0, y0));
+                                lb_DrawnOnePoint = true;
+                            }
+                            lk_Path.lineTo(QPointF(x, y));
+                            ld_LastMz = ld_Mz;
                         }
-                        lk_Path.lineTo(QPointF(x, y));
-                        ld_LastMz = ld_Mz;
                     }
-                }
-                lk_Path.lineTo(QPointF(((ld_LastMz + 0.5 / li_Charge) - xmin) * dx + x0, y0));
-                lk_Pen.setWidthF(1.0);
-                lk_Pen.setJoinStyle(Qt::BevelJoin);
-                lk_Pen.setColor(QColor(TANGO_ALUMINIUM_3));
-                if (ar_QuantitationResult.mb_UnlabeledGood)
-                {
-                    lk_Pen.setStyle(Qt::SolidLine);
-                    lk_Painter.setBrush(QBrush(QColor(TANGO_ALUMINIUM_0)));
-                }
-                else
-                {
-                    lk_Pen.setStyle(Qt::DashLine);
-                    lk_Painter.setBrush(Qt::NoBrush);
-                }
-                lk_Painter.setPen(lk_Pen);
-                
-                lk_Painter.drawPath(lk_Path);
-            }
-            
-            if (ar_QuantitationResult.md_LabeledProfileScale > 0.0)
-            {
-                lk_IsotopeEnvelope = mk_RenderIsotopeEnvelopeForPeptideWeight[ls_Peptide + "-1"];
-                lb_DrawnOnePoint = false;
-                ld_LastMz = 0.0;
-                QPainterPath lk_Path;
-                for (int i = 0; i < lk_IsotopeEnvelope.size(); ++i)
-                {
-                    double ld_Abundance = lk_IsotopeEnvelope[i].first * ar_QuantitationResult.md_LabeledProfileScale;
-                    double ld_Mz = (ld_PeptideBaseMass + lk_IsotopeEnvelope[i].second + md_HydrogenMass * li_Charge) / li_Charge;
-                    double x = (ld_Mz - xmin) * dx + x0;
-                    double y = this->scale(ld_Abundance / ymax) / ymaxScaled;
-                    if (y > 0.001)
+                    lk_Path.lineTo(QPointF(((ld_LastMz + 0.5 / li_Charge) - xmin) * dx + x0, y0));
+                    lk_Pen.setWidthF(1.0);
+                    lk_Pen.setJoinStyle(Qt::BevelJoin);
+                    lk_Pen.setColor(QColor(TANGO_ALUMINIUM_3));
+                    if (lb_Good)
                     {
-                        y = y * dy + y0;
-                        if (!lb_DrawnOnePoint)
-                        {
-                            lk_Path.moveTo(QPointF(((ld_Mz - 0.5 / li_Charge) - xmin) * dx + x0, y0));
-                            lb_DrawnOnePoint = true;
-                        }
-                        lk_Path.lineTo(QPointF(x, y));
-                        ld_LastMz = ld_Mz;
+                        lk_Pen.setStyle(Qt::SolidLine);
+                        lk_Painter.setBrush(QBrush(QColor(TANGO_ALUMINIUM_0)));
                     }
+                    else
+                    {
+                        lk_Pen.setStyle(Qt::DashLine);
+                        lk_Painter.setBrush(Qt::NoBrush);
+                    }
+                    lk_Painter.setPen(lk_Pen);
+                    
+                    lk_Painter.drawPath(lk_Path);
                 }
-                lk_Path.lineTo(QPointF(((ld_LastMz + 0.5 / li_Charge) - xmin) * dx + x0, y0));
-                lk_Pen.setWidthF(1.0);
-                lk_Pen.setJoinStyle(Qt::BevelJoin);
-                lk_Pen.setColor(QColor(TANGO_ALUMINIUM_3));
-                if (ar_QuantitationResult.mb_LabeledGood)
-                {
-                    lk_Pen.setStyle(Qt::SolidLine);
-                    lk_Painter.setBrush(QBrush(QColor(TANGO_ALUMINIUM_0)));
-                }
-                else
-                {
-                    lk_Pen.setStyle(Qt::DashLine);
-                    lk_Painter.setBrush(Qt::NoBrush);
-                }
-                lk_Painter.setPen(lk_Pen);
-                
-                lk_Painter.drawPath(lk_Path);
             }
         }
 
@@ -562,6 +532,21 @@ QString k_QuantifierBase::renderScanAsSvg(r_Scan& ar_Scan, r_ScanQuantitationRes
             lk_Painter.drawLine(QPointF(0.0, y), QPointF(ld_Width, y));
             ls_Labels += QString("<text x='%1' y='%2' style='font-size:10px; font-family:Verdana;' transform='rotate(90 %1 %2)'>%3%</text>\n").arg(0.0).arg(y + 3.0).arg((int)round(ld_Line * 100.0));
         }
+        
+        // draw x ticks
+        
+/*        // xt0 and xts are x tick start and step
+        double xt0 = xmin;
+        double xts = 1.0;
+        // determine an appropriate step value
+        
+        double xt = xt0;
+        while (xt < xmax)
+        {
+            lk_Painter.drawLine(QPointF((xt - xmin) * dx + x0, y0), QPointF((xt - xmin) * dx + x0, y0 + 4.0));
+            ls_Labels += QString("<text x='%1' y='%2' style='font-size:10px; font-family:Verdana; text-anchor: middle;'>%3</text>\n").arg((xt - xmin) * dx + x0).arg(y0 + 14.0).arg((int)round(xt));
+            xt += xts;
+        }*/
 		
 		lk_Pen.setWidthF(1.0);
 		lk_Pen.setJoinStyle(Qt::RoundJoin);
@@ -586,6 +571,9 @@ QString k_QuantifierBase::renderScanAsSvg(r_Scan& ar_Scan, r_ScanQuantitationRes
             QString ls_Key = QString("%1-%2-%3").arg(ar_QuantitationResult.ms_Peptide).arg(ar_QuantitationResult.mi_Charge).arg(li_Weight);
             foreach (r_EnvelopePeaks lr_Peaks, mk_TargetsForPeptideChargeWeight[ls_Key])
             {
+                double x = (lr_Peaks.md_BaseMz - xmin) * dx + x0;
+                //lk_Painter.drawLine(x, y0), QPointF(x, y0 + 4.0));
+                ls_Labels += QString("<text x='%1' y='%2' style='font-size:10px; font-family:Verdana;'>%3</text>\n").arg(x - 4.0).arg(y0 + 14.0).arg(QString("%1 (%2)").arg(lr_Peaks.md_BaseMz, 1, 'f', 3).arg(lr_Peaks.ms_Title));
                 foreach (int li_Id, lr_Peaks.mk_RequiredIds | lr_Peaks.mk_ConsideredIds)
                 {
                     if (ak_Matches.contains(li_Id))
@@ -902,8 +890,7 @@ QHash<QString, int> k_QuantifierBase::compositionForPeptide(const QString& as_Pe
 
 
 void k_QuantifierBase::leastSquaresFit(QList<tk_DoublePair> ak_Pairs, double* ad_Factor_, 
-                                       double* ad_Error_,
-                                       double* ad_IndividualError_)
+                                       QList<double>* ak_Errors_)
 {
     double f = 0.0;
     double e = 0.0;
@@ -920,9 +907,6 @@ void k_QuantifierBase::leastSquaresFit(QList<tk_DoublePair> ak_Pairs, double* ad
     foreach (tk_DoublePair lk_Pair, ak_Pairs)
         ld_MaxTargetIntensity = std::max<double>(ld_MaxTargetIntensity, lk_Pair.first);
     
-    double ld_Error = 0.0;
-    double ld_IndividualError = 0.0;
-
     for (int i = 0; i < ak_Pairs.size(); ++i)
     {
         tk_DoublePair lk_Pair = ak_Pairs[i];
@@ -937,13 +921,8 @@ void k_QuantifierBase::leastSquaresFit(QList<tk_DoublePair> ak_Pairs, double* ad
         ld_PeakHeight /= ld_MaxTargetIntensity;
         
         double ld_ThisError = fabs(ld_PeakHeight - ld_TargetHeight);
-        ld_IndividualError = std::max<double>(ld_IndividualError, ld_ThisError);
-        ld_Error += ld_ThisError;
+        (*ak_Errors_) << ld_ThisError;
     }
-    ld_Error /= ak_Pairs.size();
-    
-    *ad_Error_ = ld_Error;
-    *ad_IndividualError_ = ld_IndividualError;
 }
 
 
@@ -1120,8 +1099,6 @@ void k_QuantifierBase::parseLabel()
         }
     }
     
-    QMultiMap<QString, QString> lk_AminoAcidForDescription;
-    
     foreach (QString ls_AminoAcid, lk_EnvironmentForAminoAcid.keys())
     {
 //         printf("AE for %s:\n", ls_AminoAcid.toStdString().c_str());
@@ -1157,21 +1134,21 @@ void k_QuantifierBase::parseLabel()
             for (int i = 0; i < lk_Abundances[ls_Element].size(); ++i)
             {
                 double ld_Abundance = lk_Abundances[ls_Element][i];
-                if (ld_Abundance > 0.0)
-                    lk_Description << QString("%1% %2%3")
-                        .arg(ld_Abundance * 100, 0, 'f', 1)
+                if (ld_Abundance > 0.0 && i > 0)
+                    lk_Description << QString("%1%2%3")
                         .arg(i + mk_IsotopeEnvelope.mk_BaseIsotope[ls_Element])
-                        .arg(ls_Element);
+                        .arg(ls_Element)
+                        .arg(ld_Abundance != 1.0 ? QString(" (%1%)").arg(ld_Abundance * 100, 0, 'f', 1) : "");
             }
         }
-        lk_AminoAcidForDescription.insert(lk_Description.join(", "), ls_AminoAcid);
+        mk_AminoAcidForDescription.insert(lk_Description.join(", "), ls_AminoAcid);
     }
 /*    if (!mb_Quiet)
     {
         printf("Label composition:\n");
-        foreach (QString ls_Description, lk_AminoAcidForDescription.uniqueKeys())
+        foreach (QString ls_Description, mk_AminoAcidForDescription.uniqueKeys())
         {
-            QStringList lk_AminoAcids = lk_AminoAcidForDescription.values(ls_Description);
+            QStringList lk_AminoAcids = mk_AminoAcidForDescription.values(ls_Description);
             if (lk_AminoAcids.size() == 20)
                 lk_AminoAcids = QStringList() << "all amino acids";
             printf("%s: %s\n", lk_AminoAcids.join(", ").toStdString().c_str(), ls_Description.toStdString().c_str());
@@ -1354,6 +1331,51 @@ tk_IsotopeEnvelope k_QuantifierBase::heavyEnvelopeForPeptide(QString as_Peptide,
     }
     
     return lr_HeavyMass;*/
+}
+
+
+QString k_QuantifierBase::heavyEnvelopeTitle(tk_StringIntHash ak_StarAminoAcids)
+{
+    QString ls_Result;
+    
+    // lk_AminoAcidOrder contains all labeled amino acids, unconditional first, followed by star amino acids
+    QStringList lk_AminoAcidOrder;
+    foreach (QString ls_AminoAcid, mk_AminoAcidForDescription.values())
+    {
+        if ((!ak_StarAminoAcids.contains(ls_AminoAcid)) && (!lk_AminoAcidOrder.contains(ls_AminoAcid)))
+            lk_AminoAcidOrder << ls_AminoAcid;
+    }
+    foreach (QString ls_AminoAcid, mk_AminoAcidForDescription.values())
+    {
+        if ((ak_StarAminoAcids.contains(ls_AminoAcid)) && (!lk_AminoAcidOrder.contains(ls_AminoAcid)))
+            lk_AminoAcidOrder << ls_AminoAcid;
+    }
+    
+    foreach (QString ls_Description, mk_AminoAcidForDescription.uniqueKeys())
+    {
+        if (!ls_Result.isEmpty())
+            ls_Result += ", ";
+        QString ls_AminoAcidScope;
+        foreach (QString ls_AminoAcid, lk_AminoAcidOrder)
+        {
+            if (mk_AminoAcidForDescription.values(ls_Description).contains(ls_AminoAcid))
+            {
+                if (ak_StarAminoAcids.contains(ls_AminoAcid))
+                {
+                    if (ak_StarAminoAcids[ls_AminoAcid] == 0)
+                        ls_AminoAcid = "";
+                    else
+                        ls_AminoAcid += QString("%1").arg(ak_StarAminoAcids[ls_AminoAcid]);
+                }
+                ls_AminoAcidScope += ls_AminoAcid;
+            }
+        }
+        if (ls_AminoAcidScope.length() != 20)
+            ls_Result += ls_AminoAcidScope + " ";
+        ls_Result += ls_Description;
+    }
+    
+    return ls_Result;
 }
 
 

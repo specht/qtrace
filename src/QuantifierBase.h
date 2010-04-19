@@ -97,6 +97,8 @@ struct r_EnvelopePeaks
     QSet<int> mk_RequiredIds;
     QSet<int> mk_ConsideredIds;
     QSet<int> mk_ForbiddenIds;
+    QString ms_Title;
+    double md_BaseMz;
 };
 
 
@@ -114,12 +116,11 @@ struct r_ScanQuantitationResult
     int mi_Charge;
 	double md_AmountUnlabeled;
 	double md_AmountLabeled;
-    double md_UnlabeledProfileScale;
-    double md_LabeledProfileScale;
 	double md_MinMz;
 	double md_MaxMz;
-    bool mb_UnlabeledGood;
-    bool mb_LabeledGood;
+    // mk_ProfileScale and mk_Good keys: "0-title" or "1-title" (light or heavy)
+    QHash<QString, double> mk_ProfileScale;
+    QHash<QString, bool> mk_Good;
 };
 
 
@@ -153,7 +154,7 @@ public:
 	
 	virtual QString renderScanAsSvg(r_Scan& ar_Scan, r_ScanQuantitationResult ar_QuantitationResult, QList<r_Peak>& ak_AllPeaks, QHash<int, int>& ak_Matches);
     QHash<QString, int> compositionForPeptide(const QString& as_Peptide);
-    void leastSquaresFit(QList<tk_DoublePair> ak_Pairs, double* ad_Factor_, double* ad_Error_, double* ad_IndividualError_);
+    void leastSquaresFit(QList<tk_DoublePair> ak_Pairs, double* ad_Factor_, QList<double>* ak_Errors_);
     
     // parallel mass matching, attention: both lists must be sorted!
     QHash<int, int> matchTargetsToPeaks(QList<double> ak_PeakMz, QMultiMap<double, int> ak_TargetMzMin, QHash<int, tk_DoublePair> ak_TargetMzAndIntensity, QSet<int> ak_ForbiddenIds);
@@ -178,6 +179,7 @@ protected:
     QVariant::Type peekNextToken(QStringList ak_StringList);
     tk_IsotopeEnvelope lightEnvelopeForPeptide(QString as_Peptide);
     tk_IsotopeEnvelope heavyEnvelopeForPeptide(QString as_Peptide, tk_StringIntHash ak_StarAminoAcids = tk_StringIntHash());
+    QString heavyEnvelopeTitle(tk_StringIntHash ak_StarAminoAcids = tk_StringIntHash());
     int heavyMassShiftForPeptide(QString as_Peptide, tk_StringIntHash ak_StarAminoAcids = tk_StringIntHash());
 
     // general information
@@ -232,7 +234,7 @@ protected:
     
     QHash<QString, tk_ArtificialEnvironment> mk_Label;
     QHash<QString, tk_DoublePair> mk_RenderMzRangeForPeptideChargeWeight;
-    QHash<QString, tk_IsotopeEnvelope> mk_RenderIsotopeEnvelopeForPeptideWeight;
+    QHash<QString, tk_IsotopeEnvelope> mk_RenderIsotopeEnvelopeForPeptideWeightTitle;
     QHash<QString, double> mk_RenderBaseMassForPeptide;
     
     QHash<int, tk_DoublePair> mk_TargetMzAndIntensity;
@@ -245,4 +247,5 @@ protected:
     QHash<QString, QList<r_EnvelopePeaks> > mk_TargetsForPeptideChargeWeight;
     QSet<int> mk_ForbiddenIds;
     QSet<QString> mk_StarAminoAcids;
+    QMultiMap<QString, QString> mk_AminoAcidForDescription;
 };
