@@ -114,10 +114,10 @@ struct r_ScanQuantitationResult
 {
     QString ms_Peptide;
     int mi_Charge;
-	double md_AmountUnlabeled;
-	double md_AmountLabeled;
-	double md_MinMz;
-	double md_MaxMz;
+    double md_AmountUnlabeled;
+    double md_AmountLabeled;
+    double md_MinMz;
+    double md_MaxMz;
     // mk_ProfileScale and mk_Good keys: "0-title" or "1-title" (light or heavy)
     QHash<QString, double> mk_ProfileScale;
     QHash<QString, bool> mk_Good;
@@ -126,17 +126,17 @@ struct r_ScanQuantitationResult
 
 struct r_Bucket
 {
-	r_Bucket(int ai_Start, int ai_Length)
-		: mi_Start(ai_Start)
-		, mi_Length(ai_Length)
-	{
-	}
-	
-	int mi_Start;
-	int mi_Length;
-	QList<int> mk_Entries;
+    r_Bucket(int ai_Start, int ai_Length)
+        : mi_Start(ai_Start)
+        , mi_Length(ai_Length)
+    {
+    }
+    
+    int mi_Start;
+    int mi_Length;
+    QList<int> mk_Entries;
 };
-		
+        
 
 // peptide => scan results
 typedef QPair<double, double> tk_DoublePair;
@@ -147,12 +147,12 @@ typedef QHash<QString, int> tk_StringIntHash;
 class k_QuantifierBase: public k_ScanIterator
 {
 public:
-	k_QuantifierBase(QStringList& ak_Arguments, QSet<r_Parameter::Enumeration> ak_Parameters, QString as_ProgramName, QString as_AdditionalArguments = QString());
-	virtual ~k_QuantifierBase();
-	
-	virtual void progressFunction(QString as_ScanId, bool ab_InterestingScan);
-	
-	virtual QString renderScanAsSvg(r_Scan& ar_Scan, r_ScanQuantitationResult ar_QuantitationResult, QList<r_Peak>& ak_AllPeaks, QHash<int, int>& ak_Matches);
+    k_QuantifierBase(QStringList& ak_Arguments, QSet<r_Parameter::Enumeration> ak_Parameters, QString as_ProgramName, QString as_AdditionalArguments = QString());
+    virtual ~k_QuantifierBase();
+    
+    virtual void progressFunction(QString as_ScanId, bool ab_InterestingScan);
+    
+    virtual QString renderScanAsSvg(r_Scan& ar_Scan, r_ScanQuantitationResult ar_QuantitationResult, QList<r_Peak>& ak_AllPeaks, QHash<int, int>& ak_Matches);
     QHash<QString, int> compositionForPeptide(const QString& as_Peptide);
     void leastSquaresFit(QList<tk_DoublePair> ak_Pairs, double* ad_Factor_, QList<double>* ak_Errors_);
     
@@ -167,12 +167,12 @@ public:
     double stringToDouble(QString as_String);
     
     void removeNonPeptides(QSet<QString>& ak_List);
-	
+    
 protected:
     virtual void parseArguments(QStringList& ak_Arguments);
-	virtual double calculatePeptideMass(QString as_Peptide, int ai_Charge);
-	virtual double scale(const double ad_Value) const;
-	double gaussian(double x, double a, double b, double c);
+    virtual double calculatePeptideMass(QString as_Peptide, int ai_Charge);
+    virtual double scale(const double ad_Value) const;
+    double gaussian(double x, double a, double b, double c);
     void parseLabel();
     QStringList tokenize(QString as_String);
     QString fetchNextToken(QStringList* ak_StringList_, QVariant::Type* ae_Type_);
@@ -188,22 +188,22 @@ protected:
     QString ms_AdditionalArguments;
 
     // parameters
-	QString ms_Label;
+    QString ms_Label;
     bool mb_UseIsotopeEnvelopes;
-	int mi_MinCharge;
-	int mi_MaxCharge;
-	double md_MinSnr;
-	double md_MassAccuracy;
+    int mi_MinCharge;
+    int mi_MaxCharge;
+    double md_MinSnr;
+    double md_MassAccuracy;
     double md_AbsenceMassAccuracyFactor;
     double md_RequireAbundance;
     double md_ConsiderAbundance;
     double md_MaxFitError;
     int mi_FixedIsotopePeakCount;
     bool mb_CheckForbiddenPeak;
-	bool mb_Quiet;
+    bool mb_Quiet;
     bool mb_LogScale;
     
-	QHash<char, double> mk_AminoAcidWeight;
+    QHash<char, double> mk_AminoAcidWeight;
     QHash<char, QHash<QString, int> > mk_AminoAcidComposition;
     
     RefPtr<QIODevice> mk_pCsvDevice;
@@ -212,9 +212,9 @@ protected:
     RefPtr<QTextStream> mk_pCsvStream;
     RefPtr<QTextStream> mk_pXhtmlStream;
     
-	// peptide-charge-label-isotope
-	QHash<QString, int> mk_TargetMzIndex;
-	
+    // peptide-charge-label-isotope
+    QHash<QString, int> mk_TargetMzIndex;
+    
     double md_WaterMass;
     double md_HydrogenMass;
     

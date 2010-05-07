@@ -52,8 +52,8 @@ int main(int ai_ArgumentCount, char** ac_Arguments__)
             << r_Parameter::XhtmlOutputPath;
 
     QStringList lk_Arguments;
-	for (int i = 1; i < ai_ArgumentCount; ++i)
-		lk_Arguments << ac_Arguments__[i];
+    for (int i = 1; i < ai_ArgumentCount; ++i)
+        lk_Arguments << ac_Arguments__[i];
     
     k_Quantifier lk_Quantifier(lk_Arguments, lk_Parameters, "qtrace", "--spectraFiles <path> ... --peptideFiles <path> ... --peptides <peptide> ...");
     lk_Quantifier.run();
@@ -70,10 +70,10 @@ int main(int ai_ArgumentCount, char** ac_Arguments__)
                       */
 
                       /*
-	// remove duplicate peptides
-	QSet<QString> lk_PeptidesSet = lk_Peptides.toSet();
-	lk_Peptides = lk_PeptidesSet.toList();
-		
-	lk_Quantifier.quantify(lk_SpectraFiles, lk_Peptides);
+    // remove duplicate peptides
+    QSet<QString> lk_PeptidesSet = lk_Peptides.toSet();
+    lk_Peptides = lk_PeptidesSet.toList();
+        
+    lk_Quantifier.quantify(lk_SpectraFiles, lk_Peptides);
     */
 }

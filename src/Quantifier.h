@@ -28,12 +28,12 @@ typedef QPair<double, double> tk_DoublePair;
 class k_Quantifier: public k_QuantifierBase
 {
 public:
-	k_Quantifier(QStringList& ak_Arguments, QSet<r_Parameter::Enumeration> ak_Parameters, QString as_ProgramName, QString as_AdditionalArguments = QString());
-	virtual ~k_Quantifier();
-	
-	virtual void run();
+    k_Quantifier(QStringList& ak_Arguments, QSet<r_Parameter::Enumeration> ak_Parameters, QString as_ProgramName, QString as_AdditionalArguments = QString());
+    virtual ~k_Quantifier();
     
-	virtual void handleScan(r_Scan& ar_Scan, bool& ab_Continue);
+    virtual void run();
+    
+    virtual void handleScan(r_Scan& ar_Scan, bool& ab_Continue);
 protected:
     virtual void parseArguments(QStringList& ak_Arguments);
     

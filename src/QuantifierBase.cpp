@@ -33,19 +33,19 @@ k_QuantifierBase::k_QuantifierBase(QStringList& ak_Arguments, QSet<r_Parameter::
     , mk_Parameters(ak_Parameters)
     , ms_ProgramName(as_ProgramName)
     , ms_AdditionalArguments(as_AdditionalArguments)
-	, ms_Label(DEFAULT_LABEL)
+    , ms_Label(DEFAULT_LABEL)
     , mb_UseIsotopeEnvelopes(DEFAULT_USE_ISOTOPE_ENVELOPES)
-	, mi_MinCharge(DEFAULT_MIN_CHARGE)
-	, mi_MaxCharge(DEFAULT_MAX_CHARGE)
-	, md_MinSnr(DEFAULT_MIN_SNR)
-	, md_MassAccuracy(DEFAULT_MASS_ACCURACY)
-	, md_AbsenceMassAccuracyFactor(DEFAULT_ABSENCE_MASS_ACCURACY_FACTOR)
+    , mi_MinCharge(DEFAULT_MIN_CHARGE)
+    , mi_MaxCharge(DEFAULT_MAX_CHARGE)
+    , md_MinSnr(DEFAULT_MIN_SNR)
+    , md_MassAccuracy(DEFAULT_MASS_ACCURACY)
+    , md_AbsenceMassAccuracyFactor(DEFAULT_ABSENCE_MASS_ACCURACY_FACTOR)
     , md_RequireAbundance(DEFAULT_REQUIRE_ABUNDANCE)
     , md_ConsiderAbundance(DEFAULT_CONSIDER_ABUNDANCE)
     , md_MaxFitError(DEFAULT_MAX_FIT_ERROR)
     , mi_FixedIsotopePeakCount(DEFAULT_FIXED_ISOTOPE_PEAK_COUNT)
-	, mb_CheckForbiddenPeak(DEFAULT_CHECK_FORBIDDEN_PEAK)
-	, mb_Quiet(DEFAULT_QUIET)
+    , mb_CheckForbiddenPeak(DEFAULT_CHECK_FORBIDDEN_PEAK)
+    , mb_Quiet(DEFAULT_QUIET)
     , mb_LogScale(DEFAULT_LOG_SCALE)
 {
     Q_INIT_RESOURCE(qtrace);
@@ -57,28 +57,28 @@ k_QuantifierBase::k_QuantifierBase(QStringList& ak_Arguments, QSet<r_Parameter::
     double ld_OxygenMass = mk_IsotopeEnvelope.mk_BaseIsotopeMass["O"];
     md_WaterMass = md_HydrogenMass * 2.0 + ld_OxygenMass;
     
-	// test parameter sanity
-	if (mi_MinCharge < 1)
-	{
-		printf("Error: minimum charge (%d) out of range.\n", mi_MinCharge);
-		exit(1);
-	}
-	if (mi_MaxCharge < 1)
-	{
-		printf("Error: maximum charge (%d) out of range.\n", mi_MaxCharge);
-		exit(1);
-	}
-	if (mi_MaxCharge < mi_MinCharge)
-	{
-		printf("Error: minimum charge (%d) bigger than maximum charge(%d).\n", mi_MinCharge, mi_MaxCharge);
-		exit(1);
-	}
-	if (md_MassAccuracy < 0.0)
-	{
-		printf("Error: mass accuracy must not be less than zero.\n");
-		exit(1);
-	}
-	if (md_AbsenceMassAccuracyFactor < 0.0)
+    // test parameter sanity
+    if (mi_MinCharge < 1)
+    {
+        printf("Error: minimum charge (%d) out of range.\n", mi_MinCharge);
+        exit(1);
+    }
+    if (mi_MaxCharge < 1)
+    {
+        printf("Error: maximum charge (%d) out of range.\n", mi_MaxCharge);
+        exit(1);
+    }
+    if (mi_MaxCharge < mi_MinCharge)
+    {
+        printf("Error: minimum charge (%d) bigger than maximum charge(%d).\n", mi_MinCharge, mi_MaxCharge);
+        exit(1);
+    }
+    if (md_MassAccuracy < 0.0)
+    {
+        printf("Error: mass accuracy must not be less than zero.\n");
+        exit(1);
+    }
+    if (md_AbsenceMassAccuracyFactor < 0.0)
     {
         printf("Error: absence mass accuracy factor must not be less than zero.\n");
         exit(1);
@@ -110,12 +110,12 @@ k_QuantifierBase::k_QuantifierBase(QStringList& ak_Arguments, QSet<r_Parameter::
     }
 
     QFile lk_File(":ext/proteomics-knowledge-base/amino-acids.csv");
-	if (!lk_File.open(QFile::ReadOnly))
+    if (!lk_File.open(QFile::ReadOnly))
     {
         fprintf(stderr, "Error: Unable to open amino-acids.csv.\n");
         exit(1);
     }
-	QTextStream lk_TextStream(&lk_File);
+    QTextStream lk_TextStream(&lk_File);
 
     QString ls_Header = lk_TextStream.readLine().toLower().trimmed();
     QStringList lk_Header = ls_Header.split(",");
@@ -127,50 +127,50 @@ k_QuantifierBase::k_QuantifierBase(QStringList& ak_Arguments, QSet<r_Parameter::
         fprintf(stderr, "Error: Something is wrong with amino-acids.csv.\n");
         exit(1);
     }
-	while (!lk_TextStream.atEnd())
-	{
-		QString ls_Line = lk_TextStream.readLine().trimmed();
-		if (ls_Line.trimmed().isEmpty())
-			continue;
+    while (!lk_TextStream.atEnd())
+    {
+        QString ls_Line = lk_TextStream.readLine().trimmed();
+        if (ls_Line.trimmed().isEmpty())
+            continue;
 
-		QStringList lk_List;
-		foreach (QString ls_Entry, ls_Line.split(QChar(',')))
-		{
+        QStringList lk_List;
+        foreach (QString ls_Entry, ls_Line.split(QChar(',')))
+        {
             if (ls_Entry.length() >= 2)
             {
                 if (ls_Entry.at(0) == QChar('"') && ls_Entry.at(ls_Entry.length() - 1) == QChar('"'))
                     ls_Entry = ls_Entry.mid(1, ls_Entry.length() - 2);
             }
-			lk_List << ls_Entry;
-		}
-		char lc_AminoAcid = lk_List[li_LetterIndex][0].toAscii();
-		mk_AminoAcidWeight[lc_AminoAcid] = lk_List[li_MassIndex].toDouble();
-		QString ls_Composition = lk_List[li_CompositionIndex];
-		ls_Composition.remove("\"");
-		QHash<QString, int> lk_ElementCount;
-		while (!ls_Composition.isEmpty())
-		{
-			char lc_Element = ls_Composition.at(0).toAscii();
-			lk_ElementCount[QString(lc_Element)] = 1;
-			ls_Composition = ls_Composition.right(ls_Composition.length() - 1);
-			if (ls_Composition.isEmpty())
-				break;
-			QString ls_Number;
-			char lc_NextChar = ls_Composition.at(0).toAscii();
-			while (lc_NextChar >= '0' && lc_NextChar <= '9')
-			{
-				ls_Number += QChar(lc_NextChar);
-				ls_Composition = ls_Composition.right(ls_Composition.length() - 1);
-				if (ls_Composition.isEmpty())
-					break;
-				lc_NextChar = ls_Composition.at(0).toAscii();
-			}
-			if (!ls_Number.isEmpty())
-				lk_ElementCount[QString(lc_Element)] = ls_Number.toInt();
-		}
+            lk_List << ls_Entry;
+        }
+        char lc_AminoAcid = lk_List[li_LetterIndex][0].toAscii();
+        mk_AminoAcidWeight[lc_AminoAcid] = lk_List[li_MassIndex].toDouble();
+        QString ls_Composition = lk_List[li_CompositionIndex];
+        ls_Composition.remove("\"");
+        QHash<QString, int> lk_ElementCount;
+        while (!ls_Composition.isEmpty())
+        {
+            char lc_Element = ls_Composition.at(0).toAscii();
+            lk_ElementCount[QString(lc_Element)] = 1;
+            ls_Composition = ls_Composition.right(ls_Composition.length() - 1);
+            if (ls_Composition.isEmpty())
+                break;
+            QString ls_Number;
+            char lc_NextChar = ls_Composition.at(0).toAscii();
+            while (lc_NextChar >= '0' && lc_NextChar <= '9')
+            {
+                ls_Number += QChar(lc_NextChar);
+                ls_Composition = ls_Composition.right(ls_Composition.length() - 1);
+                if (ls_Composition.isEmpty())
+                    break;
+                lc_NextChar = ls_Composition.at(0).toAscii();
+            }
+            if (!ls_Number.isEmpty())
+                lk_ElementCount[QString(lc_Element)] = ls_Number.toInt();
+        }
         mk_AminoAcidComposition[lc_AminoAcid] = lk_ElementCount;
-	}
-	lk_File.close();
+    }
+    lk_File.close();
     
     foreach (char lc_AminoAcid, mk_AminoAcidComposition.keys())
         mk_LightIsotopeEnvelopeForAminoAcid[QString("%1").arg(lc_AminoAcid)] = mk_IsotopeEnvelope.isotopeEnvelopeForComposition(compositionForPeptide(QString("%1").arg(lc_AminoAcid)));
@@ -191,22 +191,22 @@ k_QuantifierBase::~k_QuantifierBase()
 
 bool sortByMz(const QPair<double, QString>& a, const QPair<double, QString>& b)
 {
-	return a.first < b.first;
+    return a.first < b.first;
 }
 
 
 QString dtos(double ad_Value)
 {
-	static char lc_String_[2048];
-	sprintf(lc_String_, "%1.2f", ad_Value);
-	return QString(lc_String_);
+    static char lc_String_[2048];
+    sprintf(lc_String_, "%1.2f", ad_Value);
+    return QString(lc_String_);
 }
 
 
 void k_QuantifierBase::progressFunction(QString as_ScanId, bool)
 {
-	if (!mb_Quiet)
-		printf("\r%s: scan #%s...", ms_CurrentSpectraFile.toStdString().c_str(), as_ScanId.toStdString().c_str());
+    if (!mb_Quiet)
+        printf("\r%s: scan #%s...", ms_CurrentSpectraFile.toStdString().c_str(), as_ScanId.toStdString().c_str());
 }
 
 
@@ -317,57 +317,57 @@ void k_QuantifierBase::parseArguments(QStringList& ak_Arguments)
 
 double k_QuantifierBase::calculatePeptideMass(QString as_Peptide, int ai_Charge)
 {
-	double ld_Mass = md_WaterMass;
-	for (int i = 0; i < as_Peptide.length(); ++i)
-		ld_Mass += mk_AminoAcidWeight[as_Peptide.at(i).toAscii()];
-	return (ld_Mass + md_HydrogenMass * ai_Charge) / ai_Charge;
+    double ld_Mass = md_WaterMass;
+    for (int i = 0; i < as_Peptide.length(); ++i)
+        ld_Mass += mk_AminoAcidWeight[as_Peptide.at(i).toAscii()];
+    return (ld_Mass + md_HydrogenMass * ai_Charge) / ai_Charge;
 }
 
 
 QString k_QuantifierBase::renderScanAsSvg(r_Scan& ar_Scan, r_ScanQuantitationResult ar_QuantitationResult, QList<r_Peak>& ak_AllPeaks, QHash<int, int>& ak_Matches)
 {
-	double ld_Ratio = 4.0;
-	double ld_Width = 950.0;
-	double ld_Height = ld_Width / ld_Ratio;
-	double ld_BorderTop = 4.0;
-	double ld_BorderRight = 16.0;
-	double ld_BorderBottom = 20.0;
-	double ld_BorderLeft = 16.0;
-	
-	if (ar_QuantitationResult.md_MinMz == 0.0)
-		ar_QuantitationResult.md_MinMz = ar_Scan.mr_Spectrum.md_MzValues_[0];
-	if (ar_QuantitationResult.md_MaxMz == 0.0)
-		ar_QuantitationResult.md_MaxMz = ar_Scan.mr_Spectrum.md_MzValues_[ar_Scan.mr_Spectrum.mi_PeaksCount - 1];
-		
-	int li_Start = 0;
-	int li_End = ar_Scan.mr_Spectrum.mi_PeaksCount - 1;
-	
-	// adjust start and end values
-	while (li_Start < ar_Scan.mr_Spectrum.mi_PeaksCount - 1 && ar_Scan.mr_Spectrum.md_MzValues_[li_Start] < ar_QuantitationResult.md_MinMz)
-		++li_Start;
-	while (li_End > 0 && ar_Scan.mr_Spectrum.md_MzValues_[li_End] > ar_QuantitationResult.md_MaxMz)
-		--li_End;
-	
-	if (li_Start > 0)
-		--li_Start;
-	if (li_End < ar_Scan.mr_Spectrum.mi_PeaksCount - 1)
-		++li_End;
-	if (li_End < ar_Scan.mr_Spectrum.mi_PeaksCount - 1)
-		++li_End;
-		
-	if (li_Start > li_End)
-	{
-		// oops! start and end got crossed.
-		li_Start = 0;
-		li_End = 0;
-	}
-	
-	// determine x and y extensions
-	double xmin = ar_Scan.mr_Spectrum.md_MzValues_[li_Start];
-	double xmax = ar_Scan.mr_Spectrum.md_MzValues_[li_End];
-	xmin = ar_QuantitationResult.md_MinMz;
-	xmax = ar_QuantitationResult.md_MaxMz;
-	double ymax = 0.0;
+    double ld_Ratio = 4.0;
+    double ld_Width = 950.0;
+    double ld_Height = ld_Width / ld_Ratio;
+    double ld_BorderTop = 4.0;
+    double ld_BorderRight = 16.0;
+    double ld_BorderBottom = 20.0;
+    double ld_BorderLeft = 16.0;
+    
+    if (ar_QuantitationResult.md_MinMz == 0.0)
+        ar_QuantitationResult.md_MinMz = ar_Scan.mr_Spectrum.md_MzValues_[0];
+    if (ar_QuantitationResult.md_MaxMz == 0.0)
+        ar_QuantitationResult.md_MaxMz = ar_Scan.mr_Spectrum.md_MzValues_[ar_Scan.mr_Spectrum.mi_PeaksCount - 1];
+        
+    int li_Start = 0;
+    int li_End = ar_Scan.mr_Spectrum.mi_PeaksCount - 1;
+    
+    // adjust start and end values
+    while (li_Start < ar_Scan.mr_Spectrum.mi_PeaksCount - 1 && ar_Scan.mr_Spectrum.md_MzValues_[li_Start] < ar_QuantitationResult.md_MinMz)
+        ++li_Start;
+    while (li_End > 0 && ar_Scan.mr_Spectrum.md_MzValues_[li_End] > ar_QuantitationResult.md_MaxMz)
+        --li_End;
+    
+    if (li_Start > 0)
+        --li_Start;
+    if (li_End < ar_Scan.mr_Spectrum.mi_PeaksCount - 1)
+        ++li_End;
+    if (li_End < ar_Scan.mr_Spectrum.mi_PeaksCount - 1)
+        ++li_End;
+        
+    if (li_Start > li_End)
+    {
+        // oops! start and end got crossed.
+        li_Start = 0;
+        li_End = 0;
+    }
+    
+    // determine x and y extensions
+    double xmin = ar_Scan.mr_Spectrum.md_MzValues_[li_Start];
+    double xmax = ar_Scan.mr_Spectrum.md_MzValues_[li_End];
+    xmin = ar_QuantitationResult.md_MinMz;
+    xmax = ar_QuantitationResult.md_MaxMz;
+    double ymax = 0.0;
 /*    foreach (QString ls_Title, ar_QuantitationResult.mk_UnlabeledProfileScale.keys())
     {
         double ld_Scale = ar_QuantitationResult.mk_UnlabeledProfileScale[ls_Title];
@@ -413,11 +413,11 @@ QString k_QuantifierBase::renderScanAsSvg(r_Scan& ar_Scan, r_ScanQuantitationRes
     // add a little space above
     ymax *= 1.1;
             
-	// ymax remains unscaled!
-	double ymaxScaled = this->scale(1.0);
+    // ymax remains unscaled!
+    double ymaxScaled = this->scale(1.0);
     
-	QBuffer lk_Buffer;
-	lk_Buffer.open(QBuffer::WriteOnly);
+    QBuffer lk_Buffer;
+    lk_Buffer.open(QBuffer::WriteOnly);
 
     QList<double> lk_Lines;
     if (mb_LogScale)
@@ -425,32 +425,32 @@ QString k_QuantifierBase::renderScanAsSvg(r_Scan& ar_Scan, r_ScanQuantitationRes
     else
         lk_Lines << 0.2 << 0.4 << 0.6 << 0.8 << 1.0;
             
-	double x0 = ld_BorderLeft;
-	double y0 = ld_Height - ld_BorderBottom;
-	double dx = (ld_Width - ld_BorderLeft - ld_BorderRight) / (xmax - xmin);
-	double dy = -(ld_Height - ld_BorderTop - ld_BorderBottom);
+    double x0 = ld_BorderLeft;
+    double y0 = ld_Height - ld_BorderBottom;
+    double dx = (ld_Width - ld_BorderLeft - ld_BorderRight) / (xmax - xmin);
+    double dy = -(ld_Height - ld_BorderTop - ld_BorderBottom);
     QString ls_Labels;
-	
-	{
-		QSvgGenerator lk_Generator;
-		lk_Generator.setSize(QSize((int)ld_Width, (int)ld_Height));
-		lk_Generator.setOutputDevice(&lk_Buffer);
-		
-		QPainter lk_Painter(&lk_Generator);
-		
-		// fill background
-		lk_Painter.fillRect(QRectF(0.0, 0.0, ld_Width, ld_Height), QBrush(Qt::white));
-		
-		// draw frame
-		QPen lk_Pen;
-		lk_Pen.setWidthF(1.0);
-		lk_Pen.setJoinStyle(Qt::BevelJoin);
-		lk_Pen.setColor(QColor(192, 192, 192));
-		lk_Painter.setPen(lk_Pen);
-		
-		lk_Painter.drawLine(QPointF(0.0, y0), QPointF(ld_Width, y0));
-		//lk_Painter.drawLine(QPointF(0.0, y0), QPointF(ld_Width, y0));
-		//lk_Painter.drawLine(QPointF(x0, y0), QPointF(x0, y0 + (ymax - ymin) * dy));
+    
+    {
+        QSvgGenerator lk_Generator;
+        lk_Generator.setSize(QSize((int)ld_Width, (int)ld_Height));
+        lk_Generator.setOutputDevice(&lk_Buffer);
+        
+        QPainter lk_Painter(&lk_Generator);
+        
+        // fill background
+        lk_Painter.fillRect(QRectF(0.0, 0.0, ld_Width, ld_Height), QBrush(Qt::white));
+        
+        // draw frame
+        QPen lk_Pen;
+        lk_Pen.setWidthF(1.0);
+        lk_Pen.setJoinStyle(Qt::BevelJoin);
+        lk_Pen.setColor(QColor(192, 192, 192));
+        lk_Painter.setPen(lk_Pen);
+        
+        lk_Painter.drawLine(QPointF(0.0, y0), QPointF(ld_Width, y0));
+        //lk_Painter.drawLine(QPointF(0.0, y0), QPointF(ld_Width, y0));
+        //lk_Painter.drawLine(QPointF(x0, y0), QPointF(x0, y0 + (ymax - ymin) * dy));
         
         QString ls_Peptide = ar_QuantitationResult.ms_Peptide;
         int li_Charge = ar_QuantitationResult.mi_Charge;
@@ -514,16 +514,16 @@ QString k_QuantifierBase::renderScanAsSvg(r_Scan& ar_Scan, r_ScanQuantitationRes
         }
 
         lk_Painter.setBrush(Qt::NoBrush);
-		// draw spectrum
-		lk_Pen.setWidthF(1.0);
-		lk_Pen.setJoinStyle(Qt::RoundJoin);
-		lk_Pen.setColor(QColor(TANGO_CHAMELEON_2));
-		lk_Pen.setStyle(Qt::DashLine);
-		lk_Painter.setPen(lk_Pen);
+        // draw spectrum
+        lk_Pen.setWidthF(1.0);
+        lk_Pen.setJoinStyle(Qt::RoundJoin);
+        lk_Pen.setColor(QColor(TANGO_CHAMELEON_2));
+        lk_Pen.setStyle(Qt::DashLine);
+        lk_Painter.setPen(lk_Pen);
         
-		lk_Pen.setColor(QColor(192, 192, 192));
-		lk_Painter.setPen(lk_Pen);
-		
+        lk_Pen.setColor(QColor(192, 192, 192));
+        lk_Painter.setPen(lk_Pen);
+        
         foreach (double ld_Line, lk_Lines)
         {
             double y;
@@ -547,19 +547,19 @@ QString k_QuantifierBase::renderScanAsSvg(r_Scan& ar_Scan, r_ScanQuantitationRes
             ls_Labels += QString("<text x='%1' y='%2' style='font-size:10px; font-family:Verdana; text-anchor: middle;'>%3</text>\n").arg((xt - xmin) * dx + x0).arg(y0 + 14.0).arg((int)round(xt));
             xt += xts;
         }*/
-		
-		lk_Pen.setWidthF(1.0);
-		lk_Pen.setJoinStyle(Qt::RoundJoin);
-		lk_Pen.setColor(QColor(192, 192, 192));
-		lk_Pen.setStyle(Qt::SolidLine);
-		lk_Painter.setPen(lk_Pen);
-		
-		QVector<QPointF> lk_Points;
-		for (int i = li_Start; i <= li_End; ++i)
-			lk_Points.append(QPointF((ar_Scan.mr_Spectrum.md_MzValues_[i] - xmin) * dx + x0, 
-									this->scale(ar_Scan.mr_Spectrum.md_IntensityValues_[i] / ymax) / ymaxScaled * dy + y0));
-		lk_Painter.drawPolyline(QPolygonF(lk_Points));
-		
+        
+        lk_Pen.setWidthF(1.0);
+        lk_Pen.setJoinStyle(Qt::RoundJoin);
+        lk_Pen.setColor(QColor(192, 192, 192));
+        lk_Pen.setStyle(Qt::SolidLine);
+        lk_Painter.setPen(lk_Pen);
+        
+        QVector<QPointF> lk_Points;
+        for (int i = li_Start; i <= li_End; ++i)
+            lk_Points.append(QPointF((ar_Scan.mr_Spectrum.md_MzValues_[i] - xmin) * dx + x0, 
+                                    this->scale(ar_Scan.mr_Spectrum.md_IntensityValues_[i] / ymax) / ymaxScaled * dy + y0));
+        lk_Painter.drawPolyline(QPolygonF(lk_Points));
+        
         lk_Pen.setWidthF(1.0);
         lk_Pen.setJoinStyle(Qt::RoundJoin);
         lk_Pen.setColor(QColor(TANGO_CHAMELEON_2));
@@ -607,26 +607,26 @@ QString k_QuantifierBase::renderScanAsSvg(r_Scan& ar_Scan, r_ScanQuantitationRes
             }
         }
         
-	}
-	lk_Buffer.close();
-	lk_Buffer.open(QBuffer::ReadOnly);
-	lk_Buffer.seek(0);
-	QString ls_Result = QString(lk_Buffer.readAll());
-	lk_Buffer.close();
-/*	foreach (r_Peak lr_Peak, (ar_QuantitationResult.mk_UnlabeledPeaks + ar_QuantitationResult.mk_LabeledPeaks))
-	{
-		double ld_X, ld_Y;
-		ld_X = (lr_Peak.md_PeakMz - xmin) * dx + x0;
-		ld_Y = this->scale(lr_Peak.md_PeakIntensity / ymax) / ymaxScaled * dy + y0;
-		char lc_Number_[1024];
+    }
+    lk_Buffer.close();
+    lk_Buffer.open(QBuffer::ReadOnly);
+    lk_Buffer.seek(0);
+    QString ls_Result = QString(lk_Buffer.readAll());
+    lk_Buffer.close();
+/*    foreach (r_Peak lr_Peak, (ar_QuantitationResult.mk_UnlabeledPeaks + ar_QuantitationResult.mk_LabeledPeaks))
+    {
+        double ld_X, ld_Y;
+        ld_X = (lr_Peak.md_PeakMz - xmin) * dx + x0;
+        ld_Y = this->scale(lr_Peak.md_PeakIntensity / ymax) / ymaxScaled * dy + y0;
+        char lc_Number_[1024];
         lc_Number_[0] = 0;
         // :TODO: now this always uses peak height, make this an option (area/intensity)
         sprintf(lc_Number_, "%.2g", lr_Peak.md_PeakIntensity);
         if (strlen(lc_Number_) > 0)
             ls_Labels += QString("<text x='%1' y='%2' style='font-size:10px; font-family:Verdana; fill: #aaa;' transform='rotate(90 %1 %2)'>%3</text>\n").arg(ld_X + 3.0).arg(ld_Y + 3.0).arg(lc_Number_);
-	}*/
-	ls_Result.replace("</svg>", ls_Labels + "</svg>");
-	return ls_Result;
+    }*/
+    ls_Result.replace("</svg>", ls_Labels + "</svg>");
+    return ls_Result;
 }
 
 
@@ -641,21 +641,21 @@ double k_QuantifierBase::scale(const double ad_Value) const
 
 void k_QuantifierBase::calculateMeanAndStandardDeviation(QList<double> ak_Values, double* ad_Mean_, double* ad_StandardDeviation_)
 {
-	double ld_Mean = 0.0;
-	foreach (double ld_Value, ak_Values)
-		ld_Mean += ld_Value;
-		
-	ld_Mean /= ak_Values.size();
-	
-	double ld_StandardDeviation = 0.0;
-	foreach (double ld_Value, ak_Values)
-		ld_StandardDeviation += pow(ld_Value - ld_Mean, 2.0);
-		
-	ld_StandardDeviation /= ak_Values.size();
-	ld_StandardDeviation = sqrt(ld_StandardDeviation);
-	
-	*ad_Mean_ = ld_Mean;
-	*ad_StandardDeviation_ = ld_StandardDeviation;
+    double ld_Mean = 0.0;
+    foreach (double ld_Value, ak_Values)
+        ld_Mean += ld_Value;
+        
+    ld_Mean /= ak_Values.size();
+    
+    double ld_StandardDeviation = 0.0;
+    foreach (double ld_Value, ak_Values)
+        ld_StandardDeviation += pow(ld_Value - ld_Mean, 2.0);
+        
+    ld_StandardDeviation /= ak_Values.size();
+    ld_StandardDeviation = sqrt(ld_StandardDeviation);
+    
+    *ad_Mean_ = ld_Mean;
+    *ad_StandardDeviation_ = ld_StandardDeviation;
 }
 
 
@@ -865,7 +865,7 @@ void k_QuantifierBase::removeNonPeptides(QSet<QString>& ak_List)
 
 double k_QuantifierBase::gaussian(double x, double a, double b, double c)
 {
-	return a * exp(-(pow(x - b, 2.0) / (2 * c * c)));
+    return a * exp(-(pow(x - b, 2.0) / (2 * c * c)));
 }
 
 

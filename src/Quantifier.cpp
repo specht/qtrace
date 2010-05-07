@@ -26,7 +26,7 @@ along with qTrace.  If not, see <http://www.gnu.org/licenses/>.
 
 
 k_Quantifier::k_Quantifier(QStringList& ak_Arguments, QSet<r_Parameter::Enumeration> ak_Parameters, QString as_ProgramName, QString as_AdditionalArguments)
-	: k_QuantifierBase(ak_Arguments, ak_Parameters, as_ProgramName, as_AdditionalArguments)
+    : k_QuantifierBase(ak_Arguments, ak_Parameters, as_ProgramName, as_AdditionalArguments)
 {
     parseArguments(ak_Arguments);
 }
@@ -401,8 +401,8 @@ void k_Quantifier::handleScan(r_Scan& ar_Scan, bool& ab_Continue)
         return;
     }
 
-	// find all peaks in this spectrum
-	QList<r_Peak> lk_AllPeaks = k_ScanIterator::findAllPeaks(ar_Scan.mr_Spectrum, md_MinSnr);
+    // find all peaks in this spectrum
+    QList<r_Peak> lk_AllPeaks = k_ScanIterator::findAllPeaks(ar_Scan.mr_Spectrum, md_MinSnr);
     QList<double> lk_AllPeakMz;
     foreach (r_Peak lr_Peak, lk_AllPeaks)
         lk_AllPeakMz.append(lr_Peak.md_PeakMz);
