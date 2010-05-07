@@ -243,9 +243,11 @@ protected:
     // This way, we can handle multiple mass accuracies (peak presence/absence)
     // in one go. The actual m/z for a certain id are stored in mk_TargetMzAndIntensity.
     QMultiMap<double, int> mk_Targets;
+    QSet<int> mk_ConsideredTargets;
+    QSet<int> mk_ForbiddenTargets;
+    QHash<int, QString> mk_PeptideChargeForRequiredTarget;
     
     QHash<QString, QList<r_EnvelopePeaks> > mk_TargetsForPeptideChargeWeight;
-    QSet<int> mk_ForbiddenIds;
     QSet<QString> mk_StarAminoAcids;
     QMultiMap<QString, QString> mk_AminoAcidForDescription;
 };
