@@ -176,9 +176,9 @@ k_QuantifierBase::k_QuantifierBase(QStringList& ak_Arguments, QSet<r_Parameter::
         mk_LightIsotopeEnvelopeForAminoAcid[QString("%1").arg(lc_AminoAcid)] = mk_IsotopeEnvelope.isotopeEnvelopeForComposition(compositionForPeptide(QString("%1").arg(lc_AminoAcid)));
     
     if (mk_pCsvDevice)
-        mk_pCsvStream = RefPtr<QTextStream>(new QTextStream(mk_pCsvDevice.get_Pointer()));
+        mk_pCsvStream = QSharedPointer<QTextStream>(new QTextStream(mk_pCsvDevice.data()));
     if (mk_pXhtmlDevice)
-        mk_pXhtmlStream = RefPtr<QTextStream>(new QTextStream(mk_pXhtmlDevice.get_Pointer()));
+        mk_pXhtmlStream = QSharedPointer<QTextStream>(new QTextStream(mk_pXhtmlDevice.data()));
     
     parseLabel();
 }
@@ -226,7 +226,7 @@ void k_QuantifierBase::parseArguments(QStringList& ak_Arguments)
     
     QFile* lk_StdOut_ = new QFile();
     lk_StdOut_->open(stdout, QIODevice::WriteOnly);
-    mk_pCsvDevice = RefPtr<QIODevice>(lk_StdOut_);
+    mk_pCsvDevice = QSharedPointer<QIODevice>(lk_StdOut_);
 
     // consume options
     while (!ak_Arguments.empty())
@@ -255,7 +255,7 @@ void k_QuantifierBase::parseArguments(QStringList& ak_Arguments)
         else if (mk_Parameters.contains(r_Parameter::CsvOutput) && ls_Key == "--csvOutput")
         {
             if (!stringToBool(ak_Arguments.takeFirst()))
-                mk_pCsvDevice = RefPtr<QIODevice>();
+                mk_pCsvDevice = QSharedPointer<QIODevice>();
         }
         else if (mk_Parameters.contains(r_Parameter::CsvOutputPath) && ls_Key == "--csvOutputPath")
         {
@@ -266,7 +266,7 @@ void k_QuantifierBase::parseArguments(QStringList& ak_Arguments)
                 printf("Error: Unable to open %s for writing.\n", ls_Path.toStdString().c_str());
                 exit(1);
             }
-            mk_pCsvDevice = RefPtr<QIODevice>(lk_File_);
+            mk_pCsvDevice = QSharedPointer<QIODevice>(lk_File_);
         }
         else if (mk_Parameters.contains(r_Parameter::XhtmlOutputPath) && ls_Key == "--xhtmlOutputPath")
         {
@@ -277,7 +277,7 @@ void k_QuantifierBase::parseArguments(QStringList& ak_Arguments)
                 printf("Error: Unable to open %s for writing.\n", ls_Path.toStdString().c_str());
                 exit(1);
             }
-            mk_pXhtmlDevice = RefPtr<QIODevice>(lk_File_);
+            mk_pXhtmlDevice = QSharedPointer<QIODevice>(lk_File_);
         }
         else if (mk_Parameters.contains(r_Parameter::UseIsotopeEnvelopes) && ls_Key == "--useIsotopeEnvelopes")
             mb_UseIsotopeEnvelopes = stringToBool(ak_Arguments.takeFirst());

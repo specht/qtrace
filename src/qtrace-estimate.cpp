@@ -21,7 +21,6 @@ along with SimQuant.  If not, see <http://www.gnu.org/licenses/>.
 #include <stdio.h>
 #include <ptb/FastaReader.h>
 #include "Quantifier.h"
-#include <ptb/RefPtr.h>
 #include "version.h"
 
 #define HYDROGEN_MASS 1.0078250321
@@ -296,8 +295,8 @@ int main(int ai_ArgumentCount, char** ac_Arguments__)
     QFile lk_StdOut;
     lk_StdOut.open(stdout, QIODevice::WriteOnly);
     
-    RefPtr<QFile> lk_pCsvOutFile;
-    RefPtr<QFile> lk_pXhtmlOutFile;
+    QSharedPointer<QFile> lk_pCsvOutFile;
+    QSharedPointer<QFile> lk_pXhtmlOutFile;
     
     QIODevice* lk_CsvDevice_ = &lk_StdOut;
 //     QIODevice* lk_XhtmlDevice_ = &lk_StdOut;
@@ -456,9 +455,9 @@ int main(int ai_ArgumentCount, char** ac_Arguments__)
     li_Index = lk_Arguments.indexOf("--csvOutputTarget");
     if (li_Index > -1)
     {
-        lk_pCsvOutFile = RefPtr<QFile>(new QFile(lk_Arguments[li_Index + 1]));
+        lk_pCsvOutFile = QSharedPointer<QFile>(new QFile(lk_Arguments[li_Index + 1]));
         lk_pCsvOutFile->open(QIODevice::WriteOnly);
-        lk_CsvDevice_ = lk_pCsvOutFile.get_Pointer();
+        lk_CsvDevice_ = lk_pCsvOutFile.data();
         lk_Arguments.removeAt(li_Index);
         lk_Arguments.removeAt(li_Index);
     }
@@ -466,9 +465,9 @@ int main(int ai_ArgumentCount, char** ac_Arguments__)
     li_Index = lk_Arguments.indexOf("--xhtmlOutputTarget");
     if (li_Index > -1)
     {
-        lk_pXhtmlOutFile = RefPtr<QFile>(new QFile(lk_Arguments[li_Index + 1]));
+        lk_pXhtmlOutFile = QSharedPointer<QFile>(new QFile(lk_Arguments[li_Index + 1]));
         lk_pXhtmlOutFile->open(QIODevice::WriteOnly);
-        lk_XhtmlDevice_ = lk_pXhtmlOutFile.get_Pointer();
+        lk_XhtmlDevice_ = lk_pXhtmlOutFile.data();
         lk_Arguments.removeAt(li_Index);
         lk_Arguments.removeAt(li_Index);
     }
@@ -498,7 +497,7 @@ int main(int ai_ArgumentCount, char** ac_Arguments__)
         lb_PrintStatusMessages = false;
     }
     
-    //RefPtr<QIODevice> lk_pTextDevice(new QIODevice(stdout));
+    //QSharedPointer<QIODevice> lk_pTextDevice(new QIODevice(stdout));
     
     QStringList lk_SpectraFiles;
     QHash<QString, double> lk_Peptides;

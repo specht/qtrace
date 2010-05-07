@@ -23,7 +23,6 @@ along with qTrace.  If not, see <http://www.gnu.org/licenses/>.
 #include <stdio.h>
 #include <ptb/FastaReader.h>
 #include "Quantifier.h"
-#include <ptb/RefPtr.h>
 #include "version.h"
 
 

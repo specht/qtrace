@@ -347,10 +347,10 @@ void k_Quantifier::run()
     
     if (mk_pCsvStream)
     {
-        *(mk_pCsvStream.get_Pointer()) << "Filename,Scan id,Peptide,Charge,Amount light,Amount heavy,Retention time";
+        *(mk_pCsvStream.data()) << "Filename,Scan id,Peptide,Charge,Amount light,Amount heavy,Retention time";
         if (mb_UseIsotopeEnvelopes)
-            *(mk_pCsvStream.get_Pointer()) << ",Mean error light,Max error light,Mean error heavy,Max error heavy";
-        *(mk_pCsvStream.get_Pointer()) << "\n";
+            *(mk_pCsvStream.data()) << ",Mean error light,Max error light,Mean error heavy,Max error heavy";
+        *(mk_pCsvStream.data()) << "\n";
     }
     
     
@@ -359,11 +359,11 @@ void k_Quantifier::run()
         QFile lk_File(":res/qtrace-xhtml-header.xhtml.part");
         lk_File.open(QIODevice::ReadOnly);
         QByteArray lk_Content = lk_File.readAll();
-        *(mk_pXhtmlStream.get_Pointer()) << QString(lk_Content);
-        *(mk_pXhtmlStream.get_Pointer()) << "<thead><tr><th>Filename</th><th>Scan</th><th>Peptide</th><th>Charge</th><th>Amount light</th><th>Amount heavy</th><th>Retention time</th>";
+        *(mk_pXhtmlStream.data()) << QString(lk_Content);
+        *(mk_pXhtmlStream.data()) << "<thead><tr><th>Filename</th><th>Scan</th><th>Peptide</th><th>Charge</th><th>Amount light</th><th>Amount heavy</th><th>Retention time</th>";
         if (mb_UseIsotopeEnvelopes)
-            *(mk_pXhtmlStream.get_Pointer()) << "<th>Mean error light</th><th>Max error light</th><th>Mean error heavy</th><th>Max error heavy</th>";
-        *(mk_pXhtmlStream.get_Pointer()) << "</tr></thead>\n<tbody>\n";
+            *(mk_pXhtmlStream.data()) << "<th>Mean error light</th><th>Max error light</th><th>Mean error heavy</th><th>Max error heavy</th>";
+        *(mk_pXhtmlStream.data()) << "</tr></thead>\n<tbody>\n";
 
         lk_File.close();
     }
@@ -381,11 +381,11 @@ void k_Quantifier::run()
     
     if (mk_pXhtmlStream)
     {
-        *(mk_pXhtmlStream.get_Pointer()) << "</tbody>\n";
+        *(mk_pXhtmlStream.data()) << "</tbody>\n";
         QFile lk_File(":res/qtrace-xhtml-footer.xhtml.part");
         lk_File.open(QIODevice::ReadOnly);
         QByteArray lk_Content = lk_File.readAll();
-        *(mk_pXhtmlStream.get_Pointer()) << QString(lk_Content);
+        *(mk_pXhtmlStream.data()) << QString(lk_Content);
         lk_File.close();
     }
 }
@@ -540,7 +540,7 @@ void k_Quantifier::handleScan(r_Scan& ar_Scan, bool& ab_Continue)
                 {
                     if (mk_pCsvStream)
                     {
-                        *(mk_pCsvStream.get_Pointer()) << QString("\"%1\",\"%2\",%3,%4,%5,%6,%7")
+                        *(mk_pCsvStream.data()) << QString("\"%1\",\"%2\",%3,%4,%5,%6,%7")
                             .arg(ms_CurrentSpectraFile)
                             .arg(ar_Scan.ms_Id)
                             .arg(ls_Peptide)
@@ -560,17 +560,17 @@ void k_Quantifier::handleScan(r_Scan& ar_Scan, bool& ab_Continue)
                                     ld_MaxError = std::max<double>(ld_MaxError, ld_Error);
                                 }
                                 ld_MeanError /= lk_FitErrors_[li_Envelope].size();
-                                *(mk_pCsvStream.get_Pointer()) << QString(",%1,%2") 
+                                *(mk_pCsvStream.data()) << QString(",%1,%2") 
                                     .arg(ld_MeanError, 1, 'f', 3)
                                     .arg(ld_MaxError, 1, 'f', 3);
                             }
                         }
-                        *(mk_pCsvStream.get_Pointer()) << "\n";
+                        *(mk_pCsvStream.data()) << "\n";
                     }
                     if (mk_pXhtmlStream)
                     {
-                        *(mk_pXhtmlStream.get_Pointer()) << QString("\n<!-- BEGIN PEPTIDE %1 CHARGE %2 BAND %3 SCAN %4 -->\n").arg(ls_Peptide).arg(li_Charge).arg(ms_CurrentSpectraFile).arg(ar_Scan.ms_Id);
-                        *(mk_pXhtmlStream.get_Pointer()) << QString("<tr><td>%1</td><td>%2</td><td>%3</td><td>%4</td><td>%5</td><td>%6</td><td>%7</td>")
+                        *(mk_pXhtmlStream.data()) << QString("\n<!-- BEGIN PEPTIDE %1 CHARGE %2 BAND %3 SCAN %4 -->\n").arg(ls_Peptide).arg(li_Charge).arg(ms_CurrentSpectraFile).arg(ar_Scan.ms_Id);
+                        *(mk_pXhtmlStream.data()) << QString("<tr><td>%1</td><td>%2</td><td>%3</td><td>%4</td><td>%5</td><td>%6</td><td>%7</td>")
                             .arg(ms_CurrentSpectraFile)
                             .arg(ar_Scan.ms_Id)
                             .arg(ls_Peptide)
@@ -591,19 +591,19 @@ void k_Quantifier::handleScan(r_Scan& ar_Scan, bool& ab_Continue)
                                     ld_MaxError = std::max<double>(ld_MaxError, ld_Error);
                                 }
                                 ld_MeanError /= lk_FitErrors_[li_Envelope].size();
-                                *(mk_pXhtmlStream.get_Pointer()) << QString("<td>%1%</td><td>%2%</td>")
+                                *(mk_pXhtmlStream.data()) << QString("<td>%1%</td><td>%2%</td>")
                                     .arg(ld_MeanError * 100.0, 1, 'f', 1)
                                     .arg(ld_MaxError * 100.0, 1, 'f', 1);
                             }
                         }
 /*                        if (mb_UseIsotopeEnvelopes)
-                            *(mk_pXhtmlStream.get_Pointer()) << QString("<td>%1%</td><td>%2%</td><td>%3%</td><td>%4%</td>")
+                            *(mk_pXhtmlStream.data()) << QString("<td>%1%</td><td>%2%</td><td>%3%</td><td>%4%</td>")
                                 .arg(ld_FitError_[0] * 100.0, 1, 'f', 1)
                                 .arg(ld_IndividualFitError_[0] * 100.0, 1, 'f', 1)
                                 .arg(ld_FitError_[1] * 100.0, 1, 'f', 1)
                                 .arg(ld_IndividualFitError_[1] * 100.0, 1, 'f', 1);*/
                             
-                        *(mk_pXhtmlStream.get_Pointer()) << "</tr>\n";
+                        *(mk_pXhtmlStream.data()) << "</tr>\n";
                             
                         lr_ScanResult.ms_Peptide = ls_Peptide;
                         lr_ScanResult.mi_Charge = li_Charge;
@@ -616,10 +616,10 @@ void k_Quantifier::handleScan(r_Scan& ar_Scan, bool& ab_Continue)
                         QString ls_Svg = this->renderScanAsSvg(ar_Scan, lr_ScanResult, lk_AllPeaks, lk_Matches);
                         ls_Svg.remove(QRegExp("<\\?xml.+\\?>"));
                         ls_Svg.replace(QRegExp("width=\\\"[^\\\"]*\\\"\\s+height=\\\"[^\\\"]*\\\""), "width='950' height='238'");
-                        *(mk_pXhtmlStream.get_Pointer()) << "<div style='background-color: #fff;' width='950' height='238'>";
-                        *(mk_pXhtmlStream.get_Pointer()) << ls_Svg;
-                        *(mk_pXhtmlStream.get_Pointer()) << "</div>" << endl;
-                        *(mk_pXhtmlStream.get_Pointer()) << QString("\n<!-- END PEPTIDE %1 CHARGE %2 BAND %3 SCAN %4 -->\n").arg(ls_Peptide).arg(li_Charge).arg(ms_CurrentSpectraFile).arg(ar_Scan.ms_Id);
+                        *(mk_pXhtmlStream.data()) << "<div style='background-color: #fff;' width='950' height='238'>";
+                        *(mk_pXhtmlStream.data()) << ls_Svg;
+                        *(mk_pXhtmlStream.data()) << "</div>" << endl;
+                        *(mk_pXhtmlStream.data()) << QString("\n<!-- END PEPTIDE %1 CHARGE %2 BAND %3 SCAN %4 -->\n").arg(ls_Peptide).arg(li_Charge).arg(ms_CurrentSpectraFile).arg(ar_Scan.ms_Id);
                     }
                 }
             }

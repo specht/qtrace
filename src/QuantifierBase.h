@@ -21,7 +21,6 @@ along with qTrace.  If not, see <http://www.gnu.org/licenses/>.
 #include <QtCore>
 #include <ptb/ScanIterator.h>
 #include <ptb/IsotopeEnvelope.h>
-#include <ptb/RefPtr.h>
 
 
 // AVERAGE_NEUTRON is more than questionable
@@ -206,11 +205,11 @@ protected:
     QHash<char, double> mk_AminoAcidWeight;
     QHash<char, QHash<QString, int> > mk_AminoAcidComposition;
     
-    RefPtr<QIODevice> mk_pCsvDevice;
-    RefPtr<QIODevice> mk_pXhtmlDevice;
+    QSharedPointer<QIODevice> mk_pCsvDevice;
+    QSharedPointer<QIODevice> mk_pXhtmlDevice;
     
-    RefPtr<QTextStream> mk_pCsvStream;
-    RefPtr<QTextStream> mk_pXhtmlStream;
+    QSharedPointer<QTextStream> mk_pCsvStream;
+    QSharedPointer<QTextStream> mk_pXhtmlStream;
     
     // peptide-charge-label-isotope
     QHash<QString, int> mk_TargetMzIndex;
