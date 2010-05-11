@@ -40,6 +40,7 @@ along with qTrace.  If not, see <http://www.gnu.org/licenses/>.
 #define DEFAULT_MAX_FIT_ERROR 0.2
 #define DEFAULT_FIXED_ISOTOPE_PEAK_COUNT 3
 #define DEFAULT_CHECK_FORBIDDEN_PEAK true
+#define DEFAULT_CHECK_OVERLAPPING_PEAKS true
 #define DEFAULT_QUIET false
 #define DEFAULT_CSV_OUTPUT true
 #define DEFAULT_XHTML_OUTPUT true
@@ -62,6 +63,7 @@ struct r_Parameter
         MaxFitError,
         FixedIsotopePeakCount,
         CheckForbiddenPeak,
+        CheckOverlappingPeaks,
         Quiet,
         CsvOutput,
         CsvOutputPath,
@@ -199,6 +201,7 @@ protected:
     double md_MaxFitError;
     int mi_FixedIsotopePeakCount;
     bool mb_CheckForbiddenPeak;
+    bool mb_CheckOverlappingPeaks;
     bool mb_Quiet;
     bool mb_LogScale;
     

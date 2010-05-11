@@ -43,6 +43,7 @@ int main(int ai_ArgumentCount, char** ac_Arguments__)
             << r_Parameter::MaxFitError
             << r_Parameter::FixedIsotopePeakCount
             << r_Parameter::CheckForbiddenPeak
+            << r_Parameter::CheckOverlappingPeaks
             << r_Parameter::Quiet
             << r_Parameter::LogScale
             << r_Parameter::CsvOutput
@@ -56,23 +57,4 @@ int main(int ai_ArgumentCount, char** ac_Arguments__)
     
     k_Quantifier lk_Quantifier(lk_Arguments, lk_Parameters, "qtrace", "--spectraFiles <path> ... --peptideFiles <path> ... --peptides <peptide> ...");
     lk_Quantifier.run();
-        
-    /*
-    k_Quantifier 
-        lk_Quantifier(ls_Label, le_ScanType, le_AmountEstimation,
-                      QList<tk_IntPair>() << tk_IntPair(1, 1),
-                      li_MinCharge, li_MaxCharge, ld_MinSnr, 
-                      ld_MassAccuracy, ld_RequireAbundance, 
-                      ld_ConsiderAbundance, ld_MaxFitError, lk_CsvDevice_, 
-                      lk_XhtmlDevice_, lb_CheckForbiddenPeak, 
-                      lb_PrintStatusMessages, lb_LogScale);
-                      */
-
-                      /*
-    // remove duplicate peptides
-    QSet<QString> lk_PeptidesSet = lk_Peptides.toSet();
-    lk_Peptides = lk_PeptidesSet.toList();
-        
-    lk_Quantifier.quantify(lk_SpectraFiles, lk_Peptides);
-    */
 }

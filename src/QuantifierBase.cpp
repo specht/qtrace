@@ -45,6 +45,7 @@ k_QuantifierBase::k_QuantifierBase(QStringList& ak_Arguments, QSet<r_Parameter::
     , md_MaxFitError(DEFAULT_MAX_FIT_ERROR)
     , mi_FixedIsotopePeakCount(DEFAULT_FIXED_ISOTOPE_PEAK_COUNT)
     , mb_CheckForbiddenPeak(DEFAULT_CHECK_FORBIDDEN_PEAK)
+    , mb_CheckOverlappingPeaks(DEFAULT_CHECK_OVERLAPPING_PEAKS)
     , mb_Quiet(DEFAULT_QUIET)
     , mb_LogScale(DEFAULT_LOG_SCALE)
 {
@@ -301,6 +302,8 @@ void k_QuantifierBase::parseArguments(QStringList& ak_Arguments)
             mi_FixedIsotopePeakCount = stringToInt(ak_Arguments.takeFirst());
         else if (mk_Parameters.contains(r_Parameter::CheckForbiddenPeak) && ls_Key == "--checkForbiddenPeak")
             mb_CheckForbiddenPeak = stringToBool(ak_Arguments.takeFirst());
+        else if (mk_Parameters.contains(r_Parameter::CheckOverlappingPeaks) && ls_Key == "--checkOverlappingPeaks")
+            mb_CheckOverlappingPeaks = stringToBool(ak_Arguments.takeFirst());
         else if (mk_Parameters.contains(r_Parameter::Quiet) && ls_Key == "--quiet")
             mb_Quiet = stringToBool(ak_Arguments.takeFirst());
         else if (mk_Parameters.contains(r_Parameter::LogScale) && ls_Key == "--logScale")
@@ -718,6 +721,11 @@ void k_QuantifierBase::printUsageAndExit()
     {
         printf("  --checkForbiddenPeak [yes|no] (default: %s)\n", DEFAULT_CHECK_FORBIDDEN_PEAK ? "yes" : "no");
         printf("      Specify whether the forbidden peak is required to be absent.\n");
+    }
+    if (mk_Parameters.contains(r_Parameter::CheckOverlappingPeaks))
+    {
+        printf("  --checkOverlappingPeaks [yes|no] (default: %s)\n", DEFAULT_CHECK_OVERLAPPING_PEAKS ? "yes" : "no");
+        printf("      Specify whether overlapping peaks should be checked for.\n");
     }
     if (mk_Parameters.contains(r_Parameter::AbsenceMassAccuracyFactor))
     {
@@ -1171,7 +1179,7 @@ void k_QuantifierBase::parseLabel()
             QStringList lk_AminoAcids = mk_AminoAcidForDescription.values(ls_Description);
             qSort(lk_AminoAcids);
             if (lk_AminoAcids.size() == 20)
-                lk_AminoAcids = QStringList();
+                lk_AminoAcids = QStringList() << "all amino acids";
             QString ls_Scope = lk_AminoAcids.join("");
             if (ls_Scope.size() > 1)
                 ls_Scope = "[" + ls_Scope + "]";

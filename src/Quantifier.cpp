@@ -228,117 +228,119 @@ void k_Quantifier::run()
     // now check whether there are overlapping targets between individual peptide/charge combinations
     // if yes, at first remove the considered peaks
     // if this is not sufficient, remove both peptides from the list, because they are overlapping
-    
-    /*
-    QSet<QString> lk_OverlappingPeptideChargeItems;
-    
-    QSet<int> lk_IdsToBeDeleted;
-    
-    QMultiMap<double, int>::const_iterator lk_Iter = mk_Targets.constBegin();
-    for (; lk_Iter != mk_Targets.constEnd(); ++lk_Iter)
+
+    if (mb_CheckOverlappingPeaks)
     {
-        int li_Index = lk_Iter.value();
-        if (mk_ForbiddenTargets.contains(li_Index))
-            continue;
+        QSet<QString> lk_OverlappingPeptideChargeItems;
         
-        int li_CollidingPeaks = 0;
+        QSet<int> lk_IdsToBeDeleted;
         
-        double ld_Mz = mk_TargetMzAndIntensity[li_Index].first;
-        double ld_MinMz = lk_Iter.key();
-        double ld_MaxMz = 2.0 * ld_Mz - ld_MinMz;
-        
-        QMultiMap<double, int>::const_iterator lk_CollidingIter = lk_Iter;
-        ++lk_CollidingIter;
-        while (lk_CollidingIter != mk_Targets.constEnd())
+        QMultiMap<double, int>::const_iterator lk_Iter = mk_Targets.constBegin();
+        for (; lk_Iter != mk_Targets.constEnd(); ++lk_Iter)
         {
-            double ld_OtherMz = mk_TargetMzAndIntensity[lk_CollidingIter.value()].first;
-            if (ld_OtherMz > ld_MaxMz)
-                break;
-            else
-                ++li_CollidingPeaks;
+            int li_Index = lk_Iter.value();
+            if (mk_ForbiddenTargets.contains(li_Index))
+                continue;
+            
+            int li_CollidingPeaks = 0;
+            
+            double ld_Mz = mk_TargetMzAndIntensity[li_Index].first;
+            double ld_MinMz = lk_Iter.key();
+            double ld_MaxMz = 2.0 * ld_Mz - ld_MinMz;
+            
+            QMultiMap<double, int>::const_iterator lk_CollidingIter = lk_Iter;
             ++lk_CollidingIter;
-        }
-        --lk_CollidingIter;
-        if (li_CollidingPeaks > 0)
-        {
-            // there are colliding peaks, remove all candidate peaks 
-            // and see if only one required peak remains
-            ++lk_CollidingIter;
-            QSet<int> lk_RequiredTargets;
-            QMultiMap<double, int>::const_iterator lk_Temp = lk_Iter;
-            for (; lk_Temp != lk_CollidingIter; ++lk_Temp)
+            while (lk_CollidingIter != mk_Targets.constEnd())
             {
-                int li_Index = lk_Temp.value();
-                if (mk_ForbiddenTargets.contains(li_Index))
-                    continue;
-                
-                if (mk_ConsideredTargets.contains(li_Index))
-                {
-                    // it's a considered target, remove it
-                    lk_IdsToBeDeleted << li_Index;
-                }
+                double ld_OtherMz = mk_TargetMzAndIntensity[lk_CollidingIter.value()].first;
+                if (ld_OtherMz > ld_MaxMz)
+                    break;
                 else
-                    lk_RequiredTargets << li_Index;
+                    ++li_CollidingPeaks;
+                ++lk_CollidingIter;
             }
-            if (lk_RequiredTargets.size() > 1)
+            --lk_CollidingIter;
+            if (li_CollidingPeaks > 0)
             {
-                // we still have more than one required peak here,
-                // mark all affected required peaks for deletetion,
-                // which will lead to non-handling of the appropriate peptides
-                // because at least one required peak could not be found,
-                // print a message to the screen later
-                foreach (int li_Id, lk_RequiredTargets)
+                // there are colliding peaks, remove all candidate peaks 
+                // and see if only one required peak remains
+                ++lk_CollidingIter;
+                QSet<int> lk_RequiredTargets;
+                QMultiMap<double, int>::const_iterator lk_Temp = lk_Iter;
+                for (; lk_Temp != lk_CollidingIter; ++lk_Temp)
                 {
-                    lk_OverlappingPeptideChargeItems << mk_PeptideChargeForRequiredTarget[li_Id];
-                    lk_IdsToBeDeleted << li_Index;
+                    int li_Index = lk_Temp.value();
+                    if (mk_ForbiddenTargets.contains(li_Index))
+                        continue;
+                    
+                    if (mk_ConsideredTargets.contains(li_Index))
+                    {
+                        // it's a considered target, remove it
+                        lk_IdsToBeDeleted << li_Index;
+                    }
+                    else
+                        lk_RequiredTargets << li_Index;
+                }
+                if (lk_RequiredTargets.size() > 1)
+                {
+                    // we still have more than one required peak here,
+                    // mark all affected required peaks for deletetion,
+                    // which will lead to non-handling of the appropriate peptides
+                    // because at least one required peak could not be found,
+                    // print a message to the screen later
+                    foreach (int li_Id, lk_RequiredTargets)
+                    {
+                        lk_OverlappingPeptideChargeItems << mk_PeptideChargeForRequiredTarget[li_Id];
+                        lk_IdsToBeDeleted << li_Index;
+                    }
                 }
             }
         }
+        
+        // delete items to be deleted by re-creating mk_Targets
+        QMultiMap<double, int> lk_NewTargets;
+        lk_Iter = mk_Targets.constBegin();
+        for (; lk_Iter != mk_Targets.constEnd(); ++lk_Iter)
+        {
+            int li_Index = lk_Iter.value();
+            if (!lk_IdsToBeDeleted.contains(li_Index))
+                lk_NewTargets.insert(lk_Iter.key(), lk_Iter.value());
+        }
+        mk_Targets = lk_NewTargets;
+        foreach (int li_Id, lk_IdsToBeDeleted)
+            mk_TargetMzAndIntensity.remove(li_Id);
+        
+        if (!lk_OverlappingPeptideChargeItems.empty())
+        {
+            QHash<QString, int> lk_PeptideRemoveCount;
+            foreach (QString ls_PeptideCharge, lk_OverlappingPeptideChargeItems)
+            {
+                QString ls_Peptide = ls_PeptideCharge.split("-").first();
+                if (!lk_PeptideRemoveCount.contains(ls_Peptide))
+                    lk_PeptideRemoveCount[ls_Peptide] = 0;
+                ++lk_PeptideRemoveCount[ls_Peptide];
+            }
+            int li_RemovedAllCount = 0;
+            int li_RemovedSomeCount = 0;
+            foreach (QString ls_Peptide, lk_PeptideRemoveCount.keys())
+            {
+                if (lk_PeptideRemoveCount[ls_Peptide] == (mi_MaxCharge - mi_MinCharge + 1))
+                    ++li_RemovedAllCount;
+                else
+                    ++li_RemovedSomeCount;
+            }
+            QStringList lk_Message;
+            if (li_RemovedAllCount > 0)
+                lk_Message << QString("completely ignoring %1 peptide%2").arg(li_RemovedAllCount).arg(li_RemovedAllCount != 1 ? "s" : "");
+            if (li_RemovedSomeCount > 0)
+                lk_Message << QString("ignoring some charge states of %1 peptide%2").arg(li_RemovedSomeCount).arg(li_RemovedSomeCount != 1 ? "s" : "");
+            QString ls_Message = lk_Message.join(" and ");
+            printf("Warning: %s because of overlapping required peaks.\n", ls_Message.toStdString().c_str());
+        }
     }
     
-    // delete items to be deleted by re-creating mk_Targets
-    QMultiMap<double, int> lk_NewTargets;
-    lk_Iter = mk_Targets.constBegin();
-    for (; lk_Iter != mk_Targets.constEnd(); ++lk_Iter)
-    {
-        int li_Index = lk_Iter.value();
-        if (!lk_IdsToBeDeleted.contains(li_Index))
-            lk_NewTargets.insert(lk_Iter.key(), lk_Iter.value());
-    }
-    mk_Targets = lk_NewTargets;
-    foreach (int li_Id, lk_IdsToBeDeleted)
-        mk_TargetMzAndIntensity.remove(li_Id);
     
     printf("done.\n");
-    
-    if (!lk_OverlappingPeptideChargeItems.empty())
-    {
-        QHash<QString, int> lk_PeptideRemoveCount;
-        foreach (QString ls_PeptideCharge, lk_OverlappingPeptideChargeItems)
-        {
-            QString ls_Peptide = ls_PeptideCharge.split("-").first();
-            if (!lk_PeptideRemoveCount.contains(ls_Peptide))
-                lk_PeptideRemoveCount[ls_Peptide] = 0;
-            ++lk_PeptideRemoveCount[ls_Peptide];
-        }
-        int li_RemovedAllCount = 0;
-        int li_RemovedSomeCount = 0;
-        foreach (QString ls_Peptide, lk_PeptideRemoveCount.keys())
-        {
-            if (lk_PeptideRemoveCount[ls_Peptide] == (mi_MaxCharge - mi_MinCharge + 1))
-                ++li_RemovedAllCount;
-            else
-                ++li_RemovedSomeCount;
-        }
-        QStringList lk_Message;
-        if (li_RemovedAllCount > 0)
-            lk_Message << QString("completely ignoring %1 peptide%2").arg(li_RemovedAllCount).arg(li_RemovedAllCount != 1 ? "s" : "");
-        if (li_RemovedSomeCount > 0)
-            lk_Message << QString("ignoring some charge states of %1 peptide%2").arg(li_RemovedSomeCount).arg(li_RemovedSomeCount != 1 ? "s" : "");
-        QString ls_Message = lk_Message.join(" and ");
-        printf("Warning: %s because of overlapping required peaks.\n", ls_Message.toStdString().c_str());
-    }
-    */
     
     fflush(stdout);
 
