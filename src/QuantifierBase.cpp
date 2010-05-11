@@ -1006,7 +1006,13 @@ void k_QuantifierBase::parseLabel()
 
     int li_State = 0;
     QSet<QString> lk_AminoAcidScope;
+    bool lb_AminoAcidScopeNegated = false;
     QString ls_LastAminoAcid;
+    
+    QString ls_AllAminoAcids = "GASPVTCLINDQKEMHFRYW";
+    QSet<QString> lk_AllAminoAcids;
+    for (int i = 0; i < ls_AllAminoAcids.length(); ++i)
+        lk_AllAminoAcids << ls_AllAminoAcids.mid(i, 1);
     
     // this hash contains special environmental conditions for every amino acid
     // if an amino acid is not contained, it comes from natural conditions!
@@ -1029,6 +1035,15 @@ void k_QuantifierBase::parseLabel()
                         exit(1);
                     }
                     mk_StarAminoAcids << ls_LastAminoAcid;
+                }
+                else if (ls_Token == "^")
+                {
+                    if (!lk_AminoAcidScope.empty())
+                    {
+                        printf("Error: An amino acid scope negator (^) is only allowed as the first symbol.\n");
+                        exit(1);
+                    }
+                    lb_AminoAcidScopeNegated = true;
                 }
                 else
                 {
@@ -1084,7 +1099,10 @@ void k_QuantifierBase::parseLabel()
                 for (int i = 0; i < ls_AllAminoAcids.length(); ++i)
                     lk_AminoAcidScope << ls_AllAminoAcids.mid(i, 1);
             }
-            foreach (QString ls_AminoAcid, lk_AminoAcidScope)
+            QSet<QString> lk_UseAminoAcidScope = lk_AminoAcidScope;
+            if (lb_AminoAcidScopeNegated)
+                lk_UseAminoAcidScope = lk_AllAminoAcids - lk_AminoAcidScope;
+            foreach (QString ls_AminoAcid, lk_UseAminoAcidScope)
             {
                 if (!lk_EnvironmentForAminoAcid.contains(ls_AminoAcid))
                     lk_EnvironmentForAminoAcid[ls_AminoAcid] = tk_ArtificialEnvironment();
@@ -1093,8 +1111,10 @@ void k_QuantifierBase::parseLabel()
             
             if (peekNextToken(lk_Tokens) != QVariant::Int)
             {
+                // reset everything
                 lk_AminoAcidScope.clear();
                 li_State = 0;
+                lb_AminoAcidScopeNegated = false;
             }
         }
     }
@@ -1143,17 +1163,21 @@ void k_QuantifierBase::parseLabel()
         }
         mk_AminoAcidForDescription.insert(lk_Description.join(", "), ls_AminoAcid);
     }
-/*    if (!mb_Quiet)
+    if (!mb_Quiet)
     {
         printf("Label composition:\n");
         foreach (QString ls_Description, mk_AminoAcidForDescription.uniqueKeys())
         {
             QStringList lk_AminoAcids = mk_AminoAcidForDescription.values(ls_Description);
+            qSort(lk_AminoAcids);
             if (lk_AminoAcids.size() == 20)
-                lk_AminoAcids = QStringList() << "all amino acids";
-            printf("%s: %s\n", lk_AminoAcids.join(", ").toStdString().c_str(), ls_Description.toStdString().c_str());
+                lk_AminoAcids = QStringList();
+            QString ls_Scope = lk_AminoAcids.join("");
+            if (ls_Scope.size() > 1)
+                ls_Scope = "[" + ls_Scope + "]";
+            printf("%s: %s\n", ls_Scope.toStdString().c_str(), ls_Description.toStdString().c_str());
         }
-    }*/
+    }
 }
 
 
@@ -1184,7 +1208,7 @@ QStringList k_QuantifierBase::tokenize(QString as_String)
                 }
             }
         }
-        else if (lk_Char.isLetter() || lk_Char == '*')
+        else if (lk_Char.isLetter() || lk_Char == '*' || lk_Char == '^')
         {
             lk_Result << QString(lk_Char);
             lb_Append = true;
