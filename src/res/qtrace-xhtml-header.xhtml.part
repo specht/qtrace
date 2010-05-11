@@ -30,6 +30,3 @@ function toggle(id, flag)
 </head>
 <body>
 <table>
-<tr>
-<th>filename</th><th>scan id</th><th>peptide</th><th>amount light</th><th>amount heavy</th><th>retention time</th><th>charge</th><th>filter line</th><th>snr</th>
-</tr>

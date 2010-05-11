@@ -1,6 +1,6 @@
 include(../base.pro)
 
-TARGET = qtrace
+TARGET = qtrace-estimate
 CONFIG(debug, debug|release) {
     TARGET = $$join(TARGET,,,_debug)
 }
@@ -8,9 +8,8 @@ CONFIG(debug, debug|release) {
 RESOURCES += ../../src/qtrace.qrc
 
 HEADERS += \
-    ../../src/Quantifier.h \
-    ../../src/Tango.h \
+    ../../src/Estimator.h \
 
 SOURCES += \
-    ../../src/Quantifier.cpp \
-    ../../src/qtrace.cpp \
+    ../../src/Estimator.cpp \
+    ../../src/qtrace-estimate.cpp \

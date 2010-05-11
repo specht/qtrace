@@ -1,0 +1,3 @@
+[submodule "ext/proteomics-knowledge-base"]
+	path = ext/proteomics-knowledge-base
+	url = git@gpf.uni-muenster.de:proteomics-knowledge-base.git
