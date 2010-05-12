@@ -1186,6 +1186,12 @@ void k_QuantifierBase::parseLabel()
             printf("%s: %s\n", ls_Scope.toStdString().c_str(), ls_Description.toStdString().c_str());
         }
     }
+    if ((!mk_StarAminoAcids.empty()) && mb_UseIsotopeEnvelopes)
+    {
+        printf("Warning: You are using a label containing the star symbol (*) in conjunction\n");
+        printf("with isotope envelope fitting, which is not fully supported yet. Please consider\n");
+        printf("using a fixed number of isotope envelope peaks instead.\n");
+    }
 }
 
 
