@@ -83,7 +83,7 @@ void k_Quantifier::run()
                 
                 tk_IsotopeEnvelope lk_EnvelopeNormalized = k_IsotopeEnvelope::normalize(lk_Envelope);
                 
-                int li_HeavyMassShift = heavyMassShiftForPeptide(ls_Peptide, lk_StarAminoAcidCount);
+//                 int li_HeavyMassShift = heavyMassShiftForPeptide(ls_Peptide, lk_StarAminoAcidCount);
                 
                 QString ls_EnvelopeTitle = "natural";
                 
@@ -102,10 +102,6 @@ void k_Quantifier::run()
                     QString ls_PeptideChargeWeight = QString("%1-%2-%3").arg(ls_Peptide).arg(li_Charge).arg(li_Envelope);
                     mk_TargetsForPeptideChargeWeight[ls_PeptideChargeWeight].append(r_EnvelopePeaks());
                     mk_TargetsForPeptideChargeWeight[ls_PeptideChargeWeight].last().ms_Title = ls_EnvelopeTitle;
-                    // ld_BaseMz and ld_BaseIntensity keep information about the most abundant peak,
-                    // later ld_BaseMz will be copied into the newly created mk_TargetsForPeptideChargeWeight[ls_PeptideChargeWeight].last()
-                    double ld_BaseMz = 0.0;
-                    double ld_BaseIntensity = 0.0;
                     
                     if (!mk_RenderMzRangeForPeptideChargeWeight.contains(ls_PeptideChargeWeight))
                         mk_RenderMzRangeForPeptideChargeWeight[ls_PeptideChargeWeight] = tk_DoublePair(1e20, -1e20);
@@ -131,6 +127,12 @@ void k_Quantifier::run()
                         mk_RenderMzRangeForPeptideChargeWeight[ls_PeptideChargeWeight].second = std::max<double>(ld_Mz, mk_RenderMzRangeForPeptideChargeWeight[ls_PeptideChargeWeight].second);
                     }
 
+                    double ld_EnvelopeBaseMass = lightMassForPeptide(ls_Peptide);
+                    if (li_Envelope > 0)
+                        ld_EnvelopeBaseMass += nominalMassShiftForPeptide(ls_Peptide, lk_StarAminoAcidCount);
+                    double ld_EnvelopeBaseMz = (ld_EnvelopeBaseMass + md_HydrogenMass * li_Charge) / li_Charge;
+                    mk_TargetsForPeptideChargeWeight[ls_PeptideChargeWeight].last().md_BaseMz = ld_EnvelopeBaseMz;
+                    
                     // add peaks from isotope envelope
                     for (int li_PeakIndex = 0; li_PeakIndex < lk_Envelope.size(); ++li_PeakIndex)
                     {
@@ -150,8 +152,10 @@ void k_Quantifier::run()
                         }
                         else
                         {
-                            int li_LightOrHeavyPeakIndex = li_PeakIndex - li_Envelope * li_HeavyMassShift;
-                            lb_Required = (li_LightOrHeavyPeakIndex >= 0) && (li_LightOrHeavyPeakIndex < mi_FixedIsotopePeakCount);
+                            //int li_LightOrHeavyPeakIndex = li_PeakIndex - li_Envelope * li_HeavyMassShift;
+                            //lb_Required = (li_LightOrHeavyPeakIndex >= 0) && (li_LightOrHeavyPeakIndex < mi_FixedIsotopePeakCount);
+                            int li_NominalPeakIndex = (int)round(ld_BaseMass + ld_MassShift - ld_EnvelopeBaseMass);
+                            lb_Required = (li_NominalPeakIndex >= 0) && (li_NominalPeakIndex < mi_FixedIsotopePeakCount) && (ld_NormalizedAbundance > 0.0001);
                         }
                         
                         if (lb_Required || lb_Considered)
@@ -177,14 +181,7 @@ void k_Quantifier::run()
                             mk_RenderMzRangeForPeptideChargeWeight[ls_PeptideChargeWeight].first = std::min<double>(ld_Mz, mk_RenderMzRangeForPeptideChargeWeight[ls_PeptideChargeWeight].first);
                             mk_RenderMzRangeForPeptideChargeWeight[ls_PeptideChargeWeight].second = std::max<double>(ld_Mz, mk_RenderMzRangeForPeptideChargeWeight[ls_PeptideChargeWeight].second);
                         }
-                        
-                        if (ld_Abundance > ld_BaseIntensity)
-                        {
-                            ld_BaseIntensity = ld_Abundance;
-                            ld_BaseMz = ld_Mz;
-                        }
                     }
-                    mk_TargetsForPeptideChargeWeight[ls_PeptideChargeWeight].last().md_BaseMz = ld_BaseMz;
                 }
                 // now advance the star amino acid count, and break the loop if we're finished
                 if (li_Envelope == 0)

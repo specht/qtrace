@@ -1103,7 +1103,6 @@ void k_QuantifierBase::parseLabel()
             if (lk_AminoAcidScope.empty() || lk_AminoAcidScope.contains("X"))
             {
                 lk_AminoAcidScope = QSet<QString>();
-                QString ls_AllAminoAcids = "GASPVTCLINDQKEMHFRYW";
                 for (int i = 0; i < ls_AllAminoAcids.length(); ++i)
                     lk_AminoAcidScope << ls_AllAminoAcids.mid(i, 1);
             }
@@ -1115,6 +1114,7 @@ void k_QuantifierBase::parseLabel()
                 if (!lk_EnvironmentForAminoAcid.contains(ls_AminoAcid))
                     lk_EnvironmentForAminoAcid[ls_AminoAcid] = tk_ArtificialEnvironment();
                 lk_EnvironmentForAminoAcid[ls_AminoAcid][ls_Element] = r_IsotopeAbundance(li_Isotope - mk_IsotopeEnvelope.mk_BaseIsotope[ls_Element], ld_Efficiency);
+//                 mk_NominalMassShiftForAminoAcid[ls_AminoAcid]
             }
             
             if (peekNextToken(lk_Tokens) != QVariant::Int)
@@ -1132,7 +1132,8 @@ void k_QuantifierBase::parseLabel()
 //         printf("AE for %s:\n", ls_AminoAcid.toStdString().c_str());
         tk_ArtificialEnvironment lk_Environment = lk_EnvironmentForAminoAcid[ls_AminoAcid];
         QHash<QString, QList<double> > lk_Abundances;
-        int li_MassShift = 0;
+        QHash<QString, QList<double> > lk_AbundancesFull;
+        double ld_MassShift = 0.0;
         foreach (QString ls_Element, lk_Environment.keys())
         {
             r_IsotopeAbundance lr_IsotopeAbundance = lk_Environment[ls_Element];
@@ -1147,11 +1148,10 @@ void k_QuantifierBase::parseLabel()
             if (mk_AminoAcidComposition[ls_AminoAcid.at(0).toAscii()].contains(ls_Element))
                 li_AtomCount = mk_AminoAcidComposition[ls_AminoAcid.at(0).toAscii()][ls_Element];
             if (li_AtomCount > 0)
-                li_MassShift += (int)round(mk_IsotopeEnvelope.mk_ElementIsotopeMassShift[ls_Element][lr_IsotopeAbundance.mi_Isotope]) * li_AtomCount;
+                ld_MassShift += mk_IsotopeEnvelope.mk_ElementIsotopeMassShift[ls_Element][lr_IsotopeAbundance.mi_Isotope] * li_AtomCount;
         }
         mk_HeavyIsotopeEnvelopeForAminoAcid[ls_AminoAcid] = k_IsotopeEnvelope(lk_Abundances).isotopeEnvelopeForComposition(compositionForPeptide(ls_AminoAcid));
-        
-        mk_HeavyMassShiftForAminoAcid[ls_AminoAcid] = li_MassShift;
+        mk_NominalMassShiftForAminoAcid[ls_AminoAcid] = ld_MassShift;
         
         // make description
         QStringList lk_ElementList = lk_Abundances.keys();
@@ -1366,6 +1366,12 @@ tk_IsotopeEnvelope k_QuantifierBase::heavyEnvelopeForPeptide(QString as_Peptide,
 }
 
 
+double k_QuantifierBase::lightMassForPeptide(QString as_Peptide)
+{
+    return mk_IsotopeEnvelope.massForComposition(compositionForPeptide(as_Peptide));
+}
+
+
 QString k_QuantifierBase::heavyEnvelopeTitle(tk_StringIntHash ak_StarAminoAcids)
 {
     QString ls_Result;
@@ -1411,11 +1417,11 @@ QString k_QuantifierBase::heavyEnvelopeTitle(tk_StringIntHash ak_StarAminoAcids)
 }
 
 
-int k_QuantifierBase::heavyMassShiftForPeptide(QString as_Peptide, tk_StringIntHash ak_StarAminoAcids)
+double k_QuantifierBase::nominalMassShiftForPeptide(QString as_Peptide, tk_StringIntHash ak_StarAminoAcids)
 {
     QHash<QString, int> lk_Composition = compositionForPeptide(as_Peptide);
     
-    int li_MassShift = 0;
+    double ld_MassShift = 0.0;
     
     tk_StringIntHash lk_UsedStarAminoAcids;
     
@@ -1430,19 +1436,19 @@ int k_QuantifierBase::heavyMassShiftForPeptide(QString as_Peptide, tk_StringIntH
     for (int i = 0; i < as_Peptide.length(); ++i)
     {
         QString ls_AminoAcid = as_Peptide.mid(i, 1);
-        int li_Delta = 0;
+        double ld_Delta = 0.0;
         if (!mk_StarAminoAcids.contains(ls_AminoAcid))
-            li_Delta = mk_HeavyMassShiftForAminoAcid[ls_AminoAcid];
+            ld_Delta = mk_NominalMassShiftForAminoAcid[ls_AminoAcid];
         else
         {
             if (lk_UsedStarAminoAcids[ls_AminoAcid] < ak_StarAminoAcids[ls_AminoAcid])
             {
-                li_Delta = mk_HeavyMassShiftForAminoAcid[ls_AminoAcid];
+                ld_Delta = mk_NominalMassShiftForAminoAcid[ls_AminoAcid];
                 ++lk_UsedStarAminoAcids[ls_AminoAcid];
             }
         }
-        li_MassShift += li_Delta;
+        ld_MassShift += ld_Delta;
     }
     
-    return li_MassShift;
+    return ld_MassShift;
 }

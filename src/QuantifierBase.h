@@ -180,8 +180,9 @@ protected:
     QVariant::Type peekNextToken(QStringList ak_StringList);
     tk_IsotopeEnvelope lightEnvelopeForPeptide(QString as_Peptide);
     tk_IsotopeEnvelope heavyEnvelopeForPeptide(QString as_Peptide, tk_StringIntHash ak_StarAminoAcids = tk_StringIntHash());
+    double lightMassForPeptide(QString as_Peptide);
     QString heavyEnvelopeTitle(tk_StringIntHash ak_StarAminoAcids = tk_StringIntHash());
-    int heavyMassShiftForPeptide(QString as_Peptide, tk_StringIntHash ak_StarAminoAcids = tk_StringIntHash());
+    double nominalMassShiftForPeptide(QString as_Peptide, tk_StringIntHash ak_StarAminoAcids = tk_StringIntHash());
 
     // general information
     QSet<r_Parameter::Enumeration> mk_Parameters;
@@ -230,9 +231,10 @@ protected:
     
     // this hash contains a heavy isotope envelope for every labeled amino acid
     QHash<QString, tk_IsotopeEnvelope> mk_HeavyIsotopeEnvelopeForAminoAcid;
-    
-    // this hash contains a mass shift for every labeled amino acid
-    QHash<QString, int> mk_HeavyMassShiftForAminoAcid;
+
+    // this hash contains a mass shift for every labeled amino acid,
+    // assuming a labeling efficiency of 100%
+    QHash<QString, double> mk_NominalMassShiftForAminoAcid;
     
     QHash<QString, tk_ArtificialEnvironment> mk_Label;
     QHash<QString, tk_DoublePair> mk_RenderMzRangeForPeptideChargeWeight;
