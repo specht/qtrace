@@ -1181,6 +1181,15 @@ void k_QuantifierBase::parseLabel()
             if (lk_AminoAcids.size() == 20)
                 lk_AminoAcids = QStringList() << "all amino acids";
             QString ls_Scope = lk_AminoAcids.join("");
+            QString ls_StarredScope;
+            for (int i = 0; i < ls_Scope.length(); ++i)
+            {
+                QString ls_AminoAcid = ls_Scope.mid(i, 1);
+                ls_StarredScope += ls_AminoAcid;
+                if (mk_StarAminoAcids.contains(ls_AminoAcid))
+                    ls_StarredScope += "*";
+            }
+            ls_Scope = ls_StarredScope;
             if (ls_Scope.size() > 1)
                 ls_Scope = "[" + ls_Scope + "]";
             printf("%s: %s\n", ls_Scope.toStdString().c_str(), ls_Description.toStdString().c_str());
