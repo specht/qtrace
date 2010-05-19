@@ -332,7 +332,7 @@ QString k_QuantifierBase::renderScanAsSvg(r_Scan& ar_Scan, r_ScanQuantitationRes
     double ld_Ratio = 4.0;
     double ld_Width = 950.0;
     double ld_Height = ld_Width / ld_Ratio;
-    double ld_BorderTop = 4.0;
+    double ld_BorderTop = 8.0;
     double ld_BorderRight = 16.0;
     double ld_BorderBottom = 20.0;
     double ld_BorderLeft = 16.0;
@@ -413,10 +413,6 @@ QString k_QuantifierBase::renderScanAsSvg(r_Scan& ar_Scan, r_ScanQuantitationRes
         }
     }
     
-    // add a little space above
-    ymax *= 1.1;
-            
-    // ymax remains unscaled!
     double ymaxScaled = this->scale(1.0);
     
     QBuffer lk_Buffer;

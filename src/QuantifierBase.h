@@ -44,7 +44,7 @@ along with qTrace.  If not, see <http://www.gnu.org/licenses/>.
 #define DEFAULT_QUIET false
 #define DEFAULT_CSV_OUTPUT true
 #define DEFAULT_XHTML_OUTPUT true
-#define DEFAULT_LOG_SCALE true
+#define DEFAULT_LOG_SCALE false
 
 struct r_Parameter
 {
