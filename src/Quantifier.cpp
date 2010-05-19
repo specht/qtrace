@@ -360,8 +360,8 @@ void k_Quantifier::run()
         QByteArray lk_Content = lk_File.readAll();
         *(mk_pXhtmlStream.data()) << QString(lk_Content);
         *(mk_pXhtmlStream.data()) << "<thead><tr><th>Filename</th><th>Scan</th><th>Peptide</th><th>Charge</th><th>Amount light</th><th>Amount heavy</th><th>Retention time</th>";
-        if (mb_UseIsotopeEnvelopes)
-            *(mk_pXhtmlStream.data()) << "<th>Mean error light</th><th>Max error light</th><th>Mean error heavy</th><th>Max error heavy</th>";
+/*        if (mb_UseIsotopeEnvelopes)
+            *(mk_pXhtmlStream.data()) << "<th>Mean error light</th><th>Max error light</th><th>Mean error heavy</th><th>Max error heavy</th>";*/
         *(mk_pXhtmlStream.data()) << "</tr></thead>\n<tbody>\n";
 
         lk_File.close();
@@ -578,7 +578,7 @@ void k_Quantifier::handleScan(r_Scan& ar_Scan, bool& ab_Continue)
                             .arg(ld_AmountsEnvelope_[1], 1, 'f', 4)
                             .arg(ar_Scan.md_RetentionTime, 1, 'f', 2);
                             
-                        if (mb_UseIsotopeEnvelopes)
+/*                        if (mb_UseIsotopeEnvelopes)
                         {
                             for (int li_Envelope = 0; li_Envelope < 2; ++li_Envelope)
                             {
@@ -594,7 +594,7 @@ void k_Quantifier::handleScan(r_Scan& ar_Scan, bool& ab_Continue)
                                     .arg(ld_MeanError * 100.0, 1, 'f', 1)
                                     .arg(ld_MaxError * 100.0, 1, 'f', 1);
                             }
-                        }
+                        }*/
 /*                        if (mb_UseIsotopeEnvelopes)
                             *(mk_pXhtmlStream.data()) << QString("<td>%1%</td><td>%2%</td><td>%3%</td><td>%4%</td>")
                                 .arg(ld_FitError_[0] * 100.0, 1, 'f', 1)
