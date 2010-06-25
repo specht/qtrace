@@ -35,7 +35,7 @@ else {
 
 DESTDIR = ../../
 
-QT = core xml svg gui
+QT = core xml
 
 HEADERS += \
     ../../src/QuantifierBase.h \

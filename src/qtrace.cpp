@@ -21,7 +21,6 @@ along with qTrace.  If not, see <http://www.gnu.org/licenses/>.
 
 #include <QtCore>
 #include <stdio.h>
-#include <ptb/FastaReader.h>
 #include "Quantifier.h"
 #include "version.h"
 
