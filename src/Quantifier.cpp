@@ -19,7 +19,6 @@ along with qTrace.  If not, see <http://www.gnu.org/licenses/>.
 
 #include "Quantifier.h"
 #include <QtCore>
-#include <QtSvg>
 #include <math.h> 
 #include <limits>
 #include "Tango.h"
