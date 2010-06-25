@@ -19,7 +19,6 @@ along with qTrace.  If not, see <http://www.gnu.org/licenses/>.
 
 #include "QuantifierBase.h"
 #include <QtCore>
-#include <QtSvg>
 #include <math.h> 
 #include <limits>
 #include "Tango.h"
@@ -329,6 +328,7 @@ double k_QuantifierBase::calculatePeptideMass(QString as_Peptide, int ai_Charge)
 
 QString k_QuantifierBase::renderScanAsSvg(r_Scan& ar_Scan, r_ScanQuantitationResult ar_QuantitationResult, QList<r_Peak>& ak_AllPeaks, QHash<int, int>& ak_Matches)
 {
+    QString ls_Result;
     double ld_Ratio = 4.0;
     double ld_Width = 950.0;
     double ld_Height = ld_Width / ld_Ratio;
@@ -371,32 +371,6 @@ QString k_QuantifierBase::renderScanAsSvg(r_Scan& ar_Scan, r_ScanQuantitationRes
     xmin = ar_QuantitationResult.md_MinMz;
     xmax = ar_QuantitationResult.md_MaxMz;
     double ymax = 0.0;
-/*    foreach (QString ls_Title, ar_QuantitationResult.mk_UnlabeledProfileScale.keys())
-    {
-        double ld_Scale = ar_QuantitationResult.mk_UnlabeledProfileScale[ls_Title];
-        if (ld_Scale > 0.0)
-        {
-            tk_IsotopeEnvelope lk_IsotopeEnvelope = mk_RenderIsotopeEnvelopeForPeptideWeight[ar_QuantitationResult.ms_Peptide + "-0"][ls_Title];
-            for (int i = 0; i < lk_IsotopeEnvelope.size(); ++i)
-            {
-                double ld_Abundance = lk_IsotopeEnvelope[i].first * ld_Scale;
-                ymax = std::max<double>(ymax, ld_Abundance);
-            }
-        }
-    }
-    foreach (QString ls_Title, ar_QuantitationResult.mk_LabeledProfileScale.keys())
-    {
-        double ld_Scale = ar_QuantitationResult.mk_LabeledProfileScale[ls_Title];
-        if (ld_Scale > 0.0)
-        {
-            tk_IsotopeEnvelope lk_IsotopeEnvelope = mk_RenderIsotopeEnvelopeForPeptideWeight[ar_QuantitationResult.ms_Peptide + "-1"][ls_Title];
-            for (int i = 0; i < lk_IsotopeEnvelope.size(); ++i)
-            {
-                double ld_Abundance = lk_IsotopeEnvelope[i].first * ld_Scale;
-                ymax = std::max<double>(ymax, ld_Abundance);
-            }
-        }
-    }*/
     for (int li_Weight = 0; li_Weight < 2; ++li_Weight)
     {
         QString ls_Key = QString("%1-%2-%3").arg(ar_QuantitationResult.ms_Peptide).arg(ar_QuantitationResult.mi_Charge).arg(li_Weight);
@@ -415,9 +389,6 @@ QString k_QuantifierBase::renderScanAsSvg(r_Scan& ar_Scan, r_ScanQuantitationRes
     
     double ymaxScaled = this->scale(1.0);
     
-    QBuffer lk_Buffer;
-    lk_Buffer.open(QBuffer::WriteOnly);
-
     QList<double> lk_Lines;
     if (mb_LogScale)
         lk_Lines << 0.01 << 0.1 << 1.0;
@@ -429,202 +400,126 @@ QString k_QuantifierBase::renderScanAsSvg(r_Scan& ar_Scan, r_ScanQuantitationRes
     double dx = (ld_Width - ld_BorderLeft - ld_BorderRight) / (xmax - xmin);
     double dy = -(ld_Height - ld_BorderTop - ld_BorderBottom);
     QString ls_Labels;
+    ls_Result += QString("<svg width='%1' height='%2' xmlns='http://www.w3.org/2000/svg' xmlns:xlink='http://www.w3.org/1999/xlink' version='1.2' baseProfile='tiny'>\n").arg((int)ld_Width).arg((int)ld_Height);
+    ls_Result += "<title>Qt Svg Document</title>\n";
+    ls_Result += "<desc>qTrace results</desc>\n";
     
+    // fill background
+    ls_Result += QString("<rect x='0' y='0' width='%1' height='%2' fill='white' />\n").arg((int)ld_Width).arg((int)ld_Height);
+    // draw upper border (but maybe it's not necessary?)
+    ls_Result += QString("<line x1='0' y1='0' x2='%1' y2='0' stroke='#c0c0c0' />\n").arg((int)ld_Width);
+    
+    QString ls_Peptide = ar_QuantitationResult.ms_Peptide;
+    int li_Charge = ar_QuantitationResult.mi_Charge;
+
+    tk_IsotopeEnvelope lk_IsotopeEnvelope;
+    bool lb_DrawnOnePoint;
+    double ld_LastMz;
+    
+    double ld_PeptideBaseMass = mk_RenderBaseMassForPeptide[ls_Peptide];
+    
+    if (mb_UseIsotopeEnvelopes)
     {
-        QSvgGenerator lk_Generator;
-        lk_Generator.setSize(QSize((int)ld_Width, (int)ld_Height));
-        lk_Generator.setOutputDevice(&lk_Buffer);
-        
-        QPainter lk_Painter(&lk_Generator);
-        
-        // fill background
-        lk_Painter.fillRect(QRectF(0.0, 0.0, ld_Width, ld_Height), QBrush(Qt::white));
-        
-        // draw frame
-        QPen lk_Pen;
-        lk_Pen.setWidthF(1.0);
-        lk_Pen.setJoinStyle(Qt::BevelJoin);
-        lk_Pen.setColor(QColor(192, 192, 192));
-        lk_Painter.setPen(lk_Pen);
-        
-        lk_Painter.drawLine(QPointF(0.0, y0), QPointF(ld_Width, y0));
-        //lk_Painter.drawLine(QPointF(0.0, y0), QPointF(ld_Width, y0));
-        //lk_Painter.drawLine(QPointF(x0, y0), QPointF(x0, y0 + (ymax - ymin) * dy));
-        
-        QString ls_Peptide = ar_QuantitationResult.ms_Peptide;
-        int li_Charge = ar_QuantitationResult.mi_Charge;
-
-        tk_IsotopeEnvelope lk_IsotopeEnvelope;
-        bool lb_DrawnOnePoint;
-        double ld_LastMz;
-        
-        double ld_PeptideBaseMass = mk_RenderBaseMassForPeptide[ls_Peptide];
-        
-        if (mb_UseIsotopeEnvelopes)
+        foreach (QString ls_WeightTitle, ar_QuantitationResult.mk_ProfileScale.keys())
         {
-            foreach (QString ls_WeightTitle, ar_QuantitationResult.mk_ProfileScale.keys())
+            double ld_ProfileScale = ar_QuantitationResult.mk_ProfileScale[ls_WeightTitle];
+            double lb_Good = ar_QuantitationResult.mk_Good[ls_WeightTitle];
+            if (ld_ProfileScale > 0.0)
             {
-                double ld_ProfileScale = ar_QuantitationResult.mk_ProfileScale[ls_WeightTitle];
-                double lb_Good = ar_QuantitationResult.mk_Good[ls_WeightTitle];
-                if (ld_ProfileScale > 0.0)
+                QString ls_Points;
+                lk_IsotopeEnvelope = mk_RenderIsotopeEnvelopeForPeptideWeightTitle[ls_Peptide + "-" + ls_WeightTitle];
+                
+                lb_DrawnOnePoint = false;
+                ld_LastMz = 0.0;
+                for (int i = 0; i < lk_IsotopeEnvelope.size(); ++i)
                 {
-                    lk_IsotopeEnvelope = mk_RenderIsotopeEnvelopeForPeptideWeightTitle[ls_Peptide + "-" + ls_WeightTitle];
-                    
-                    lb_DrawnOnePoint = false;
-                    ld_LastMz = 0.0;
-                    QPainterPath lk_Path;
-                    for (int i = 0; i < lk_IsotopeEnvelope.size(); ++i)
+                    double ld_Abundance = lk_IsotopeEnvelope[i].first * ld_ProfileScale;
+                    double ld_Mz = (ld_PeptideBaseMass + lk_IsotopeEnvelope[i].second + md_HydrogenMass * li_Charge) / li_Charge;
+                    double x = (ld_Mz - xmin) * dx + x0;
+                    double y = this->scale(ld_Abundance / ymax) / ymaxScaled;
+                    if (y > 0.001)
                     {
-                        double ld_Abundance = lk_IsotopeEnvelope[i].first * ld_ProfileScale;
-                        double ld_Mz = (ld_PeptideBaseMass + lk_IsotopeEnvelope[i].second + md_HydrogenMass * li_Charge) / li_Charge;
-                        double x = (ld_Mz - xmin) * dx + x0;
-                        double y = this->scale(ld_Abundance / ymax) / ymaxScaled;
-                        if (y > 0.001)
+                        y = y * dy + y0;
+                        if (!lb_DrawnOnePoint)
                         {
-                            y = y * dy + y0;
-                            if (!lb_DrawnOnePoint)
-                            {
-                                lk_Path.moveTo(QPointF(((ld_Mz - 0.5 / li_Charge) - xmin) * dx + x0, y0));
-                                lb_DrawnOnePoint = true;
-                            }
-                            lk_Path.lineTo(QPointF(x, y));
-                            ld_LastMz = ld_Mz;
+                            ls_Points += QString("M%1,%2 ").arg(((ld_Mz - 0.5 / li_Charge) - xmin) * dx + x0).arg(y0);
+                            lb_DrawnOnePoint = true;
                         }
-                    }
-                    lk_Path.lineTo(QPointF(((ld_LastMz + 0.5 / li_Charge) - xmin) * dx + x0, y0));
-                    lk_Pen.setWidthF(1.0);
-                    lk_Pen.setJoinStyle(Qt::BevelJoin);
-                    lk_Pen.setColor(QColor(TANGO_ALUMINIUM_3));
-                    if (lb_Good)
-                    {
-                        lk_Pen.setStyle(Qt::SolidLine);
-                        lk_Painter.setBrush(QBrush(QColor(TANGO_ALUMINIUM_0)));
-                    }
-                    else
-                    {
-                        lk_Pen.setStyle(Qt::DashLine);
-                        lk_Painter.setBrush(Qt::NoBrush);
-                    }
-                    lk_Painter.setPen(lk_Pen);
-                    
-                    lk_Painter.drawPath(lk_Path);
-                }
-            }
-        }
-
-        lk_Painter.setBrush(Qt::NoBrush);
-        // draw spectrum
-        lk_Pen.setWidthF(1.0);
-        lk_Pen.setJoinStyle(Qt::RoundJoin);
-        lk_Pen.setColor(QColor(TANGO_CHAMELEON_2));
-        lk_Pen.setStyle(Qt::DashLine);
-        lk_Painter.setPen(lk_Pen);
-        
-        lk_Pen.setColor(QColor(192, 192, 192));
-        lk_Painter.setPen(lk_Pen);
-        
-        foreach (double ld_Line, lk_Lines)
-        {
-            double y;
-            y = this->scale(ld_Line) / ymaxScaled;
-            y = y * dy + y0;
-            lk_Painter.drawLine(QPointF(0.0, y), QPointF(ld_Width, y));
-            ls_Labels += QString("<text x='%1' y='%2' style='font-size:10px; font-family:Verdana;' transform='rotate(90 %1 %2)'>%3%</text>\n").arg(0.0).arg(y + 3.0).arg((int)round(ld_Line * 100.0));
-        }
-        
-        // draw x ticks
-        
-/*        // xt0 and xts are x tick start and step
-        double xt0 = xmin;
-        double xts = 1.0;
-        // determine an appropriate step value
-        
-        double xt = xt0;
-        while (xt < xmax)
-        {
-            lk_Painter.drawLine(QPointF((xt - xmin) * dx + x0, y0), QPointF((xt - xmin) * dx + x0, y0 + 4.0));
-            ls_Labels += QString("<text x='%1' y='%2' style='font-size:10px; font-family:Verdana; text-anchor: middle;'>%3</text>\n").arg((xt - xmin) * dx + x0).arg(y0 + 14.0).arg((int)round(xt));
-            xt += xts;
-        }*/
-        
-        lk_Pen.setWidthF(1.0);
-        lk_Pen.setJoinStyle(Qt::RoundJoin);
-        lk_Pen.setColor(QColor(192, 192, 192));
-        lk_Pen.setStyle(Qt::SolidLine);
-        lk_Painter.setPen(lk_Pen);
-        
-        QVector<QPointF> lk_Points;
-        for (int i = li_Start; i <= li_End; ++i)
-            lk_Points.append(QPointF((ar_Scan.mr_Spectrum.md_MzValues_[i] - xmin) * dx + x0, 
-                                    this->scale(ar_Scan.mr_Spectrum.md_IntensityValues_[i] / ymax) / ymaxScaled * dy + y0));
-        lk_Painter.drawPolyline(QPolygonF(lk_Points));
-        
-        lk_Pen.setWidthF(1.0);
-        lk_Pen.setJoinStyle(Qt::RoundJoin);
-        lk_Pen.setColor(QColor(TANGO_CHAMELEON_2));
-        lk_Pen.setStyle(Qt::SolidLine);
-        lk_Painter.setPen(lk_Pen);
-        
-        for (int li_Weight = 0; li_Weight < 2; ++li_Weight)
-        {
-            QString ls_Key = QString("%1-%2-%3").arg(ar_QuantitationResult.ms_Peptide).arg(ar_QuantitationResult.mi_Charge).arg(li_Weight);
-            foreach (r_EnvelopePeaks lr_Peaks, mk_TargetsForPeptideChargeWeight[ls_Key])
-            {
-                double x = (lr_Peaks.md_BaseMz - xmin) * dx + x0;
-                //lk_Painter.drawLine(x, y0), QPointF(x, y0 + 4.0));
-                ls_Labels += QString("<text x='%1' y='%2' style='font-size:10px; font-family:Verdana;'>%3</text>\n").arg(x - 4.0).arg(y0 + 14.0).arg(QString("%1 (%2)").arg(lr_Peaks.md_BaseMz, 1, 'f', 3).arg(lr_Peaks.ms_Title));
-                foreach (int li_Id, lr_Peaks.mk_RequiredIds | lr_Peaks.mk_ConsideredIds)
-                {
-                    if (ak_Matches.contains(li_Id))
-                    {
-                        if (lr_Peaks.mk_RequiredIds.contains(li_Id))
-                            lk_Pen.setStyle(Qt::SolidLine);
-                        else
-                            lk_Pen.setStyle(Qt::DotLine);
-                        lk_Pen.setColor(QColor(TANGO_SKY_BLUE_1));
-                        lk_Painter.setPen(lk_Pen);
-                        
-                        r_Peak& lr_Peak = ak_AllPeaks[ak_Matches[li_Id]];
-                        double x = (lr_Peak.md_PeakMz - xmin) * dx + x0;
-                        double y = this->scale(lr_Peak.md_PeakIntensity / ymax) / ymaxScaled * dy + y0;
-                        lk_Painter.drawLine(QPointF(x, y0), QPointF(x, y));
-                        lk_Painter.drawArc(QRectF(QPointF(x, y) - QPointF(3.0, 3.0), QSize(6.0, 6.0)), 0, 5760);
-                    }
-                    else
-                    {
-                        if (lr_Peaks.mk_RequiredIds.contains(li_Id))
-                        {
-                            lk_Pen.setStyle(Qt::SolidLine);
-                            lk_Pen.setColor(QColor(TANGO_SCARLET_RED_2));
-                            lk_Painter.setPen(lk_Pen);
-                            
-                            double x = (mk_TargetMzAndIntensity[li_Id].first - xmin) * dx + x0;
-                            lk_Painter.drawLine(QPointF(x, y0), QPointF(x, y0 + dy));
-                        }
+                        ls_Points += QString("L%1,%2 ").arg(x).arg(y);
+                        ld_LastMz = ld_Mz;
                     }
                 }
+                ls_Points += QString("L%1,%2 ").arg(((ld_LastMz + 0.5 / li_Charge) - xmin) * dx + x0).arg(y0);
+                
+                ls_Result += QString("<g fill='%1' stroke='%2' stroke-width='1'%3>\n").
+                    arg(lb_Good ? TANGO_ALUMINIUM_0 : "none").
+                    arg(TANGO_ALUMINIUM_3).
+                    arg(lb_Good ? "" : " stroke-dasharray='4,1.5'");
+                ls_Result += QString("<path d='%1'/>\n").arg(ls_Points);
+                ls_Result += "</g>\n";
             }
         }
-        
     }
-    lk_Buffer.close();
-    lk_Buffer.open(QBuffer::ReadOnly);
-    lk_Buffer.seek(0);
-    QString ls_Result = QString(lk_Buffer.readAll());
-    lk_Buffer.close();
-/*    foreach (r_Peak lr_Peak, (ar_QuantitationResult.mk_UnlabeledPeaks + ar_QuantitationResult.mk_LabeledPeaks))
+
+    // draw y axis horizontal lines
+    ls_Result += "<g fill='none' stroke-width='1' stroke='#c0c0c0' stroke-dasharray='4,1.5' >\n";
+    foreach (double ld_Line, lk_Lines)
     {
-        double ld_X, ld_Y;
-        ld_X = (lr_Peak.md_PeakMz - xmin) * dx + x0;
-        ld_Y = this->scale(lr_Peak.md_PeakIntensity / ymax) / ymaxScaled * dy + y0;
-        char lc_Number_[1024];
-        lc_Number_[0] = 0;
-        // :TODO: now this always uses peak height, make this an option (area/intensity)
-        sprintf(lc_Number_, "%.2g", lr_Peak.md_PeakIntensity);
-        if (strlen(lc_Number_) > 0)
-            ls_Labels += QString("<text x='%1' y='%2' style='font-size:10px; font-family:Verdana; fill: #aaa;' transform='rotate(90 %1 %2)'>%3</text>\n").arg(ld_X + 3.0).arg(ld_Y + 3.0).arg(lc_Number_);
-    }*/
-    ls_Result.replace("</svg>", ls_Labels + "</svg>");
+        double y;
+        y = this->scale(ld_Line) / ymaxScaled;
+        y = y * dy + y0;
+        ls_Result += QString("<line x1='0' y1='%1' x2='%2' y2 = '%1' />\n").arg(y).arg(ld_Width);
+        ls_Labels += QString("<text x='%1' y='%2' style='font-size:10px; font-family:Verdana;' transform='rotate(90 %1 %2)'>%3%</text>\n").arg(0.0).arg(y + 3.0).arg((int)round(ld_Line * 100.0));
+    }
+    ls_Result += "</g>\n";
+    
+    // draw spectrum
+    ls_Result += "<g fill='none' stroke-width='1' stroke='#c0c0c0' >\n";
+    ls_Result += "<polyline fill='none' points='";
+    for (int i = li_Start; i <= li_End; ++i)
+    {
+        ls_Result += QString("%1,%2 ").
+            arg((ar_Scan.mr_Spectrum.md_MzValues_[i] - xmin) * dx + x0).
+            arg(this->scale(ar_Scan.mr_Spectrum.md_IntensityValues_[i] / ymax) / ymaxScaled * dy + y0);
+    }
+    ls_Result += "' />\n";
+    ls_Result += "</g>\n";
+    
+    for (int li_Weight = 0; li_Weight < 2; ++li_Weight)
+    {
+        QString ls_Key = QString("%1-%2-%3").arg(ar_QuantitationResult.ms_Peptide).arg(ar_QuantitationResult.mi_Charge).arg(li_Weight);
+        foreach (r_EnvelopePeaks lr_Peaks, mk_TargetsForPeptideChargeWeight[ls_Key])
+        {
+            double x = (lr_Peaks.md_BaseMz - xmin) * dx + x0;
+            //lk_Painter.drawLine(x, y0), QPointF(x, y0 + 4.0));
+            ls_Labels += QString("<text x='%1' y='%2' style='font-size:10px; font-family:Verdana;'>%3</text>\n").arg(x - 4.0).arg(y0 + 14.0).arg(QString("%1 (%2)").arg(lr_Peaks.md_BaseMz, 1, 'f', 3).arg(lr_Peaks.ms_Title));
+            foreach (int li_Id, lr_Peaks.mk_RequiredIds | lr_Peaks.mk_ConsideredIds)
+            {
+                if (ak_Matches.contains(li_Id))
+                {
+                    ls_Result += QString("<g fill='none' stroke='%1'%2>\n").arg(TANGO_SKY_BLUE_1).arg(lr_Peaks.mk_RequiredIds.contains(li_Id) ? "" : " stroke-dasharray='2,1.5'");
+                    r_Peak& lr_Peak = ak_AllPeaks[ak_Matches[li_Id]];
+                    double x = (lr_Peak.md_PeakMz - xmin) * dx + x0;
+                    double y = this->scale(lr_Peak.md_PeakIntensity / ymax) / ymaxScaled * dy + y0;
+                    ls_Result += QString("<line x1='%1' y1='%2' x2='%1' y2='%3' />\n").arg(x).arg(y0).arg(y);
+                    ls_Result += QString("<circle cx='%1' cy='%2' r='3' />\n").arg(x).arg(y);
+                    ls_Result += "</g>\n";
+                }
+                else
+                {
+                    if (lr_Peaks.mk_RequiredIds.contains(li_Id))
+                    {
+                        ls_Result += QString("<g fill='none' stroke='%1'>\n").arg(TANGO_SCARLET_RED_2);
+                        double x = (mk_TargetMzAndIntensity[li_Id].first - xmin) * dx + x0;
+                        ls_Result += QString("<line x1='%1' y1='%2' x2='%1' y2='%3' />\n").arg(x).arg(y0).arg(y0 + dy);
+                        ls_Result += "</g>\n";
+                    }
+                }
+            }
+        }
+    }
+    ls_Result += ls_Labels;
+    ls_Result += "</svg>";
     return ls_Result;
 }
 

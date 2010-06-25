@@ -16,8 +16,11 @@ macx {
     QMAKE_MACOSX_DEPLOYMENT_TARGET = 10.4
 }
 
-linux {
+unix {
     CONFIG += static
+    QMAKE_LFLAGS += -L/usr/local/lib
+    LIBS += -ldl -lrt
+    message("STATIC LINKAGE")
 }
 
 LIBS += -lptb -lz -lbz2 -lquazip
@@ -35,7 +38,7 @@ else {
 
 DESTDIR = ../../
 
-QT = core xml svg gui
+QT = core xml
 
 HEADERS += \
     ../../src/QuantifierBase.h \
