@@ -16,7 +16,7 @@ macx {
     QMAKE_MACOSX_DEPLOYMENT_TARGET = 10.4
 }
 
-unix {
+linux-g++ {
     CONFIG += static
     QMAKE_LFLAGS += -L/usr/local/lib
     LIBS += -ldl -lrt
