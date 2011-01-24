@@ -111,7 +111,7 @@ void k_Quantifier::run()
                     // add forbidden peak if light envelope
                     if (mb_CheckForbiddenPeak && (li_Envelope == 0))
                     {
-                        double ld_Mz = (ld_BaseMass - AVERAGE_NEUTRON + md_HydrogenMass * li_Charge) / li_Charge;
+                        double ld_Mz = (ld_BaseMass - AVERAGE_NEUTRON + md_ProtonMass * li_Charge) / li_Charge;
                         double ld_Error = ld_Mz * (md_MassAccuracy / 1000000.0) * md_AbsenceMassAccuracyFactor;
                         double ld_MzMin = ld_Mz - ld_Error;
                         // oy, it's the forbidden peak!
@@ -129,7 +129,7 @@ void k_Quantifier::run()
                     double ld_EnvelopeBaseMass = lightMassForPeptide(ls_Peptide);
                     if (li_Envelope > 0)
                         ld_EnvelopeBaseMass += nominalMassShiftForPeptide(ls_Peptide, lk_StarAminoAcidCount);
-                    double ld_EnvelopeBaseMz = (ld_EnvelopeBaseMass + md_HydrogenMass * li_Charge) / li_Charge;
+                    double ld_EnvelopeBaseMz = (ld_EnvelopeBaseMass + md_ProtonMass * li_Charge) / li_Charge;
                     mk_TargetsForPeptideChargeWeight[ls_PeptideChargeWeight].last().md_BaseMz = ld_EnvelopeBaseMz;
                     
                     // add peaks from isotope envelope
@@ -141,7 +141,7 @@ void k_Quantifier::run()
                         double ld_Abundance = lk_Envelope[li_PeakIndex].first;
                         double ld_NormalizedAbundance = lk_EnvelopeNormalized[li_PeakIndex].first;
                         double ld_MassShift = lk_Envelope[li_PeakIndex].second;
-                        double ld_Mz = (ld_BaseMass + ld_MassShift + md_HydrogenMass * li_Charge) / li_Charge;
+                        double ld_Mz = (ld_BaseMass + ld_MassShift + md_ProtonMass * li_Charge) / li_Charge;
                         double ld_Error = ld_Mz * (md_MassAccuracy / 1000000.0);
                         double ld_MzMin = ld_Mz - ld_Error;
                         if (mb_UseIsotopeEnvelopes)

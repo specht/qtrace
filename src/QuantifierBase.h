@@ -220,6 +220,7 @@ protected:
     
     double md_WaterMass;
     double md_HydrogenMass;
+    double md_ProtonMass;
     
     QString ms_CurrentSpectraFile;
 

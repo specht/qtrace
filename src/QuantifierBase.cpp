@@ -47,6 +47,7 @@ k_QuantifierBase::k_QuantifierBase(QStringList& ak_Arguments, QSet<r_Parameter::
     , mb_CheckOverlappingPeaks(DEFAULT_CHECK_OVERLAPPING_PEAKS)
     , mb_Quiet(DEFAULT_QUIET)
     , mb_LogScale(DEFAULT_LOG_SCALE)
+    , md_ProtonMass(1.00727646677)
 {
     Q_INIT_RESOURCE(qtrace);
     
@@ -322,7 +323,7 @@ double k_QuantifierBase::calculatePeptideMass(QString as_Peptide, int ai_Charge)
     double ld_Mass = md_WaterMass;
     for (int i = 0; i < as_Peptide.length(); ++i)
         ld_Mass += mk_AminoAcidWeight[as_Peptide.at(i).toAscii()];
-    return (ld_Mass + md_HydrogenMass * ai_Charge) / ai_Charge;
+    return (ld_Mass + md_ProtonMass * ai_Charge) / ai_Charge;
 }
 
 
@@ -434,7 +435,7 @@ QString k_QuantifierBase::renderScanAsSvg(r_Scan& ar_Scan, r_ScanQuantitationRes
                 for (int i = 0; i < lk_IsotopeEnvelope.size(); ++i)
                 {
                     double ld_Abundance = lk_IsotopeEnvelope[i].first * ld_ProfileScale;
-                    double ld_Mz = (ld_PeptideBaseMass + lk_IsotopeEnvelope[i].second + md_HydrogenMass * li_Charge) / li_Charge;
+                    double ld_Mz = (ld_PeptideBaseMass + lk_IsotopeEnvelope[i].second + md_ProtonMass * li_Charge) / li_Charge;
                     double x = (ld_Mz - xmin) * dx + x0;
                     double y = this->scale(ld_Abundance / ymax) / ymaxScaled;
                     if (y > 0.001)
