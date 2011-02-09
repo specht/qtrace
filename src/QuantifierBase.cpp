@@ -769,14 +769,51 @@ double k_QuantifierBase::gaussian(double x, double a, double b, double c)
 }
 
 
+// peptides may also be PEPTIDE+C2O6H (but don't write COOH)
 QHash<QString, int> k_QuantifierBase::compositionForPeptide(const QString& as_Peptide)
 {
+    QString ls_Peptide = as_Peptide;
     QHash<QString, int> lk_Composition;
     lk_Composition["H"] = 2;
     lk_Composition["O"] = 1;
-    for (int i = 0; i < as_Peptide.size(); ++i)
+    
+    if (ls_Peptide.contains("+"))
     {
-        char lc_AminoAcid = as_Peptide.at(i).toAscii();
+        QStringList lk_Parts = ls_Peptide.split("+");
+        ls_Peptide = lk_Parts[0];
+        QString ls_Composition = lk_Parts[1];
+        // TODO: CODE DUPLICATION HERE!!!
+        QHash<QString, int> lk_AminoAcidComposition;
+        while (!ls_Composition.isEmpty())
+        {
+            char lc_Element = ls_Composition.at(0).toAscii();
+            lk_AminoAcidComposition[QString(lc_Element)] = 1;
+            ls_Composition = ls_Composition.right(ls_Composition.length() - 1);
+            if (ls_Composition.isEmpty())
+                break;
+            QString ls_Number;
+            char lc_NextChar = ls_Composition.at(0).toAscii();
+            while (lc_NextChar >= '0' && lc_NextChar <= '9')
+            {
+                ls_Number += QChar(lc_NextChar);
+                ls_Composition = ls_Composition.right(ls_Composition.length() - 1);
+                if (ls_Composition.isEmpty())
+                    break;
+                lc_NextChar = ls_Composition.at(0).toAscii();
+            }
+            if (!ls_Number.isEmpty())
+                lk_AminoAcidComposition[QString(lc_Element)] = ls_Number.toInt();
+        }
+        foreach (QString ls_Element, lk_AminoAcidComposition.keys())
+        {
+            if (!lk_Composition.contains(ls_Element))
+                lk_Composition[ls_Element] = 0;
+            lk_Composition[ls_Element] += lk_AminoAcidComposition[ls_Element];
+        }
+    }
+    for (int i = 0; i < ls_Peptide.size(); ++i)
+    {
+        char lc_AminoAcid = ls_Peptide.at(i).toAscii();
         QHash<QString, int> lk_AminoAcidComposition = mk_AminoAcidComposition[lc_AminoAcid];
         foreach (QString ls_Element, lk_AminoAcidComposition.keys())
         {
