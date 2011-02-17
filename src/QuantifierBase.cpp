@@ -741,7 +741,8 @@ void k_QuantifierBase::removeNonPeptides(QSet<QString>& ak_List)
     
     foreach (QString ls_Peptide, ak_List)
     {
-        QString ls_Rest = ls_Peptide;
+        QStringList lk_Peptide = ls_Peptide.split("+");
+        QString ls_Rest = lk_Peptide[0];
         ls_Rest.replace(QRegExp("[GASPVTCLINDQKEMHFRYW]"), "");
         if (!ls_Rest.isEmpty())
         {
@@ -1216,6 +1217,14 @@ tk_IsotopeEnvelope k_QuantifierBase::lightEnvelopeForPeptide(QString as_Peptide)
 
 tk_IsotopeEnvelope k_QuantifierBase::heavyEnvelopeForPeptide(QString as_Peptide, tk_StringIntHash ak_StarAminoAcids)
 {
+    QString ls_Peptide = as_Peptide;
+    QString ls_Extra;
+    if (ls_Peptide.contains("+"))
+    {
+        QStringList lk_Parts = ls_Peptide.split("+");
+        ls_Peptide = lk_Parts[0];
+        ls_Extra = lk_Parts[1];
+    }
     tk_IsotopeEnvelope lk_Result;
 
     foreach (QString ls_AminoAcid, mk_StarAminoAcids)
@@ -1228,9 +1237,9 @@ tk_IsotopeEnvelope k_QuantifierBase::heavyEnvelopeForPeptide(QString as_Peptide,
     
     bool lb_First = true;
     
-    for (int i = 0; i < as_Peptide.length(); ++i)
+    for (int i = 0; i < ls_Peptide.length(); ++i)
     {
-        QString ls_AminoAcid = as_Peptide.mid(i, 1);
+        QString ls_AminoAcid = ls_Peptide.mid(i, 1);
         tk_IsotopeEnvelope lk_UseEnvelope = mk_LightIsotopeEnvelopeForAminoAcid[ls_AminoAcid];
         if (mk_HeavyIsotopeEnvelopeForAminoAcid.contains(ls_AminoAcid))
         {
@@ -1251,62 +1260,11 @@ tk_IsotopeEnvelope k_QuantifierBase::heavyEnvelopeForPeptide(QString as_Peptide,
             lk_Result = mk_IsotopeEnvelope.add(lk_Result, lk_UseEnvelope);
         lb_First = false;
     }
+    if (!ls_Extra.isEmpty())
+    {
+        lk_Result = mk_IsotopeEnvelope.add(lk_Result, mk_IsotopeEnvelope.isotopeEnvelopeForComposition(compositionForPeptide(ls_Extra)));
+    }
     return lk_Result;
-    // :TODO: fix this for star amino acids
-/*    QHash<QString, int> lk_Composition = compositionForPeptide(as_Peptide);
-    
-    QHash<QString, QHash<QString, int> > lk_CompositionForAminoAcid;
-    for (int i = 0; i < as_Peptide.length(); ++i)
-    {
-        QString ls_AminoAcid = as_Peptide.mid(i, 1);
-        QString ls_Id = QString();
-        //if (mk_HeavyIsotopeEnvelopeForAminoAcid.contains(ls_AminoAcid) || mk_StarAminoAcids.contains(ls_AminoAcid))
-            ls_Id = ls_AminoAcid;
-        QHash<QString, int> lk_ThisComposition = compositionForPeptide(ls_AminoAcid);
-        foreach (QString ls_Element, lk_ThisComposition.keys())
-        {
-            if (!lk_CompositionForAminoAcid[ls_Id].contains(ls_Element))
-                lk_CompositionForAminoAcid[ls_Id][ls_Element] = 0;
-            lk_CompositionForAminoAcid[ls_Id][ls_Element] += lk_ThisComposition[ls_Element];
-        }
-    }
-    
-    tk_IsotopeEnvelope lr_HeavyMass;
-    bool lb_First = true;
-
-    tk_StringIntHash lk_UsedStarAminoAcids;
-
-    foreach (QString ls_AminoAcid, mk_StarAminoAcids)
-        if (!ak_StarAminoAcids.contains(ls_AminoAcid))
-            ak_StarAminoAcids[ls_AminoAcid] = 0;
-        
-    foreach (QString ls_AminoAcid, ak_StarAminoAcids.keys())
-        lk_UsedStarAminoAcids[ls_AminoAcid] = 0;
-    
-    foreach (QString ls_Id, lk_CompositionForAminoAcid.keys())
-    {
-        k_IsotopeEnvelope* lk_UseEnvelope_ = &mk_IsotopeEnvelope;
-        if (!ls_Id.isEmpty())
-        {
-            if (mk_StarAminoAcids.contains(ls_Id))
-            {
-                if (lk_UsedStarAminoAcids[ls_Id] < ak_StarAminoAcids[ls_Id])
-                {
-                    lk_UseEnvelope_ = &mk_HeavyIsotopeEnvelopeForAminoAcid[ls_Id];
-                    ++lk_UsedStarAminoAcids[ls_Id];
-                }
-            }
-            else
-                lk_UseEnvelope_ = &mk_HeavyIsotopeEnvelopeForAminoAcid[ls_Id];
-        }
-        if (lb_First)
-            lr_HeavyMass = lk_UseEnvelope_->isotopeEnvelopeForComposition(lk_CompositionForAminoAcid[ls_Id]);
-        else
-            lr_HeavyMass = mk_IsotopeEnvelope.add(lr_HeavyMass, lk_UseEnvelope_->isotopeEnvelopeForComposition(lk_CompositionForAminoAcid[ls_Id]));
-        lb_First = false;
-    }
-    
-    return lr_HeavyMass;*/
 }
 
 
